@@ -6,11 +6,15 @@
 
 ## English
 
-A one-click installer that automates Feishu (Lark) app creation and connects it to [OpenClaw](https://github.com/nicepkg/openclaw). Instead of manually clicking through the Feishu developer console, this tool uses Playwright browser automation to complete the entire setup in minutes.
+Connecting Feishu (Lark) to [OpenClaw](https://github.com/nicepkg/openclaw) manually is painful — you need to create an app in the developer console, copy credentials, enable the bot, add 10+ permission scopes one by one, configure event subscriptions, wire everything into OpenClaw's config, restart the gateway, and finally publish. The whole process easily takes **~1 hour** if you're doing it for the first time.
 
-### What it does
+This tool automates all of it. Just run `npm start`, log into Feishu, and **everything is done in ~5 minutes**.
 
-The installer walks through 9 automated phases:
+It uses Playwright browser automation to drive the Feishu developer console end-to-end, with a local web UI showing real-time progress.
+
+### How it works
+
+The installer runs through 9 phases automatically:
 
 1. **Login** — Opens the Feishu developer console and waits for you to log in
 2. **Create App** — Creates a new enterprise custom app with your chosen name
@@ -22,7 +26,7 @@ The installer walks through 9 automated phases:
 8. **Event Subscriptions** — Configures webhook/WebSocket event callbacks
 9. **Publish** — Submits the app for release within your organization
 
-A local web UI (Express + WebSocket) shows real-time progress, and you can resume from where you left off if anything fails.
+If anything fails mid-way, you can resume from where you left off — no need to start over.
 
 ### Prerequisites
 
@@ -74,9 +78,13 @@ MIT
 
 ## 中文
 
-飞书应用一键安装器，自动完成飞书应用创建并连接到 [OpenClaw](https://github.com/nicepkg/openclaw)。无需在飞书开发者后台手动点击操作，本工具使用 Playwright 浏览器自动化，几分钟内完成全部配置。
+手动将飞书连接到 [OpenClaw](https://github.com/nicepkg/openclaw) 非常繁琐——你需要在开发者后台创建应用、复制凭证、启用机器人能力、逐个添加 10+ 项权限、配置事件订阅、把所有配置写入 OpenClaw、重启 Gateway、最后发布应用。第一次操作至少需要 **~1 小时**。
 
-### 功能说明
+这个工具把全部流程自动化了。运行 `npm start`，登录飞书，**5 分钟内全部搞定**。
+
+工具使用 Playwright 浏览器自动化驱动飞书开发者后台，配合本地 Web 界面实时展示进度。
+
+### 自动化流程
 
 安装器自动执行 9 个阶段：
 
@@ -90,7 +98,7 @@ MIT
 8. **事件订阅** — 配置 Webhook/WebSocket 事件回调
 9. **发布应用** — 提交应用发布到企业内部
 
-本地 Web 界面（Express + WebSocket）实时展示进度，如果中途失败可以从断点恢复。
+中途失败可以从断点恢复，无需从头开始。
 
 ### 前置要求
 

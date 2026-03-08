@@ -94,7 +94,7 @@ src/config/             # OpenClaw CLI integration & gateway management
 
 ### License
 
-MIT
+Apache-2.0
 
 ---
 
@@ -188,4 +188,4 @@ src/config/             # OpenClaw CLI 集成 & Gateway 管理
 
 ### 开源协议
 
-MIT
+Apache-2.0

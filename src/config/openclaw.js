@@ -1,9 +1,12 @@
 const fs = require('fs');
+const { execFileSync } = require('child_process');
+const path = require('path');
 const {
   getOpenClawLookupHint,
   openclawExists,
   repairLegacyConfig,
   resolveOpenClawBinary,
+  resolveOpenClawPackageDir,
   runOpenClaw,
   setConfigValue,
 } = require('./openclaw-cli');
@@ -36,6 +39,7 @@ async function configureOpenClaw(bus, appId, appSecret, options = {}) {
   repairLegacyConfig(bus);
 
   ensureFeishuPlugin(bus);
+  ensureFeishuSdk(bus);
 
   setConfigValue('gateway.mode', 'local');
   setConfigValue('channels.feishu.enabled', true);
@@ -63,6 +67,51 @@ function ensureFeishuPlugin(bus) {
     runOpenClaw(['plugins', 'enable', 'feishu'], { timeout: 60000 });
     bus.sendLog('飞书插件安装并启用完成');
   }
+}
+
+function ensureFeishuSdk(bus) {
+  const packageDir = resolveOpenClawPackageDir();
+  if (!packageDir) {
+    bus.sendLog('未能定位 OpenClaw 安装目录，跳过飞书 SDK 检查');
+    return;
+  }
+
+  const sdkPackageJson = path.join(
+    packageDir,
+    'node_modules',
+    '@larksuiteoapi',
+    'node-sdk',
+    'package.json'
+  );
+
+  if (fs.existsSync(sdkPackageJson)) {
+    bus.sendLog('飞书 SDK 已安装');
+    return;
+  }
+
+  bus.sendLog('检测到飞书 SDK 缺失，正在补装 @larksuiteoapi/node-sdk...');
+
+  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
+  try {
+    execFileSync(npmCommand, ['install', '@larksuiteoapi/node-sdk', '--no-save'], {
+      cwd: packageDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 180000,
+    });
+  } catch (err) {
+    const detail = [String(err.stderr || '').trim(), String(err.stdout || '').trim()]
+      .filter(Boolean)
+      .join('\n');
+    throw new Error(`飞书 SDK 安装失败: ${detail || err.message}`);
+  }
+
+  if (!fs.existsSync(sdkPackageJson)) {
+    throw new Error('飞书 SDK 安装命令已执行，但仍未找到 @larksuiteoapi/node-sdk');
+  }
+
+  bus.sendLog('飞书 SDK 补装完成');
 }
 
 module.exports = { configureOpenClaw, loadState };

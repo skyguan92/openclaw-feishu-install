@@ -28,7 +28,7 @@ The installer runs through 9 phases automatically:
 8. **Event Subscriptions** — Configures webhook/WebSocket event callbacks
 9. **Publish** — Submits the app for release within your organization
 
-If anything fails mid-way, you can resume from where you left off — no need to start over.
+If anything fails mid-way, you can resume from where you left off, rerun from any specific phase, or stop at a chosen phase for modular use.
 
 ### Prerequisites
 
@@ -72,6 +72,25 @@ Installation state is saved under your home directory:
 - Windows: `%USERPROFILE%\\.openclaw\\.feishu-setup-state.json`
 
 If the process is interrupted, re-running `npm start` will detect the incomplete state and offer to resume or start fresh.
+
+The Web UI and REST API now support:
+
+- resume from the saved breakpoint automatically
+- restart from any specific phase (`startPhase`)
+- stop after a specific phase (`endPhase`)
+- provide an existing `appId` / `appSecret` for mid-pipeline recovery
+- clear Feishu login cookies and force a fresh QR-code login
+
+Useful API calls:
+
+```bash
+curl -X POST http://localhost:19090/api/start \
+  -H 'Content-Type: application/json' \
+  -d '{"startPhase":"restart_gateway","endPhase":"publish"}'
+
+curl -X POST http://localhost:19090/api/reset
+curl -X POST http://localhost:19090/api/reset-login
+```
 
 ### Project structure
 
@@ -122,7 +141,7 @@ Apache-2.0
 8. **事件订阅** — 配置 Webhook/WebSocket 事件回调
 9. **发布应用** — 提交应用发布到企业内部
 
-中途失败可以从断点恢复，无需从头开始。
+中途失败可以从断点恢复，也可以指定从某个阶段重新开始，或者只执行到某个阶段后暂停，方便模块化使用。
 
 ### 前置要求
 
@@ -166,6 +185,25 @@ Windows 额外说明：
 - Windows：`%USERPROFILE%\\.openclaw\\.feishu-setup-state.json`
 
 如果流程中断，重新运行 `npm start` 会检测到未完成状态，可以选择继续安装或重新开始。
+
+现在 Web UI 和 REST API 还支持：
+
+- 自动从断点继续
+- 指定从某个阶段开始执行（`startPhase`）
+- 指定执行到某个阶段即停止（`endPhase`）
+- 在中途恢复时直接填写已有 `appId` / `appSecret`
+- 清空飞书登录 cookies，强制重新扫码登录
+
+常用 API：
+
+```bash
+curl -X POST http://localhost:19090/api/start \
+  -H 'Content-Type: application/json' \
+  -d '{"startPhase":"restart_gateway","endPhase":"publish"}'
+
+curl -X POST http://localhost:19090/api/reset
+curl -X POST http://localhost:19090/api/reset-login
+```
 
 ### 项目结构
 

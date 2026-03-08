@@ -7,6 +7,7 @@ const { CONFIG_PATH } = require('../utils/paths');
 const OPENCLAW_BIN = 'openclaw';
 const WINDOWS_SHELL = process.env.ComSpec || 'cmd.exe';
 let resolvedOpenClawBin = null;
+let resolvedOpenClawPackageDir = null;
 
 function unique(values) {
   return Array.from(new Set(values.filter(Boolean)));
@@ -112,6 +113,61 @@ function resolveOpenClawBinary() {
   }) || null;
 
   return resolvedOpenClawBin;
+}
+
+function resolveOpenClawPackageDir() {
+  if (resolvedOpenClawPackageDir && fs.existsSync(path.join(resolvedOpenClawPackageDir, 'package.json'))) {
+    return resolvedOpenClawPackageDir;
+  }
+
+  const openclawBin = resolveOpenClawBinary();
+  if (!openclawBin) {
+    return null;
+  }
+
+  resolvedOpenClawPackageDir = getOpenClawPackageDirCandidates(openclawBin).find((candidate) => {
+    try {
+      return fs.existsSync(path.join(candidate, 'package.json'));
+    } catch {
+      return false;
+    }
+  }) || null;
+
+  return resolvedOpenClawPackageDir;
+}
+
+function getOpenClawPackageDirCandidates(openclawBin) {
+  const candidates = [];
+
+  try {
+    const realBin = fs.realpathSync(openclawBin);
+    const match = realBin.match(/^(.*?[\\/]node_modules[\\/]openclaw)(?:[\\/].*)?$/);
+    if (match && match[1]) {
+      candidates.push(match[1]);
+    }
+  } catch {
+    // ignore
+  }
+
+  const binDir = path.dirname(openclawBin);
+  candidates.push(
+    path.join(binDir, 'node_modules', 'openclaw'),
+    path.join(path.dirname(binDir), 'node_modules', 'openclaw')
+  );
+
+  if (process.platform === 'win32' && fs.existsSync(openclawBin)) {
+    try {
+      const shim = fs.readFileSync(openclawBin, 'utf8');
+      const match = shim.match(/%~dp0\\node_modules\\openclaw\\/);
+      if (match) {
+        candidates.unshift(path.join(binDir, 'node_modules', 'openclaw'));
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return unique(candidates);
 }
 
 function getOpenClawLookupHint() {
@@ -236,6 +292,7 @@ module.exports = {
   openclawExists,
   repairLegacyConfig,
   resolveOpenClawBinary,
+  resolveOpenClawPackageDir,
   runOpenClaw,
   runOpenClawJson,
   setConfigValue,

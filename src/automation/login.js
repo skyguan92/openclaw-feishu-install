@@ -1,6 +1,8 @@
 const S = require('./selectors');
 
-async function waitForLogin(page, bus) {
+async function waitForLogin(page, bus, options = {}) {
+  const reportPhase = options.reportPhase !== false;
+
   bus.sendLog('导航到飞书开放平台...');
 
   // Navigate with generous timeout; catch timeout errors gracefully
@@ -19,17 +21,23 @@ async function waitForLogin(page, bus) {
   bus.sendLog(`当前 URL: ${initialUrl}`);
 
   if (S.login.loggedInUrlPattern.test(initialUrl)) {
-    bus.sendPhase('login', 'done', '登录有效');
+    if (reportPhase) {
+      bus.sendPhase('login', 'done', '登录有效');
+    }
     bus.sendLog('已确认飞书登录状态有效');
     return;
   }
 
   const credentialAttempted = await tryCredentialLogin(page, bus);
   if (credentialAttempted) {
-    bus.sendPhase('login', 'waiting', '正在尝试账号密码登录，请在浏览器中处理验证码或二次确认');
+    if (reportPhase) {
+      bus.sendPhase('login', 'waiting', '正在尝试账号密码登录，请在浏览器中处理验证码或二次确认');
+    }
     bus.sendLog('已检测到 FEISHU_LOGIN_ID / FEISHU_LOGIN_PASSWORD，等待登录完成...');
   } else {
-    bus.sendPhase('login', 'waiting', '请在 Playwright 浏览器中扫码登录飞书');
+    if (reportPhase) {
+      bus.sendPhase('login', 'waiting', '请在 Playwright 浏览器中扫码登录飞书');
+    }
     bus.sendLog('等待扫码登录（5分钟超时）...');
   }
 
@@ -45,7 +53,9 @@ async function waitForLogin(page, bus) {
       await page.waitForTimeout(3000);
       const currentUrl = page.url();
       if (S.login.loggedInUrlPattern.test(currentUrl)) {
-        bus.sendPhase('login', 'done', '登录成功');
+        if (reportPhase) {
+          bus.sendPhase('login', 'done', '登录成功');
+        }
         bus.sendLog('已检测到飞书登录成功');
         return;
       }

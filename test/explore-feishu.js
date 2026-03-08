@@ -13,6 +13,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const { findSystemBrowserExecutable } = require('../src/utils/browser');
 
 const OUT_DIR = path.join(__dirname, 'explore-output');
 fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -82,9 +83,10 @@ async function dumpPageInfo(page, name) {
 }
 
 async function main() {
+  const executablePath = findSystemBrowserExecutable();
   const browser = await chromium.launch({
     headless: false,
-    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    executablePath,
     args: ['--disable-blink-features=AutomationControlled'],
   });
 

@@ -1,7 +1,6 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { waitForLogin } = require('./login');
 const { createApp } = require('./create-app');
 const { extractCredentials } = require('./credentials');
@@ -12,6 +11,16 @@ const { publishApp } = require('./publish');
 const openclawConfig = require('../config/openclaw');
 const gatewayConfig = require('../config/gateway');
 const { dismissModals } = require('./dismiss-modals');
+const { findSystemBrowserExecutable } = require('../utils/browser');
+const {
+  BROWSER_PROFILE_DIR,
+  SCREENSHOT_DIR,
+  STATE_FILE,
+} = require('../utils/paths');
+const {
+  getWindowsInteractiveTaskCommand,
+  isLikelyWindowsSshSession,
+} = require('../utils/runtime-context');
 
 const PHASES = [
   'login',
@@ -25,9 +34,55 @@ const PHASES = [
   'publish',
 ];
 
-const STATE_FILE = path.join(os.homedir(), '.openclaw', '.feishu-setup-state.json');
-const SCREENSHOT_DIR = path.join(os.homedir(), '.openclaw', 'logs', 'setup-screenshots');
-const BROWSER_PROFILE_DIR = path.join(os.homedir(), '.openclaw', 'browser-profile', 'feishu');
+const BROWSER_PROFILE_LOCK_FILES = [
+  'SingletonLock',
+  'SingletonCookie',
+  'SingletonSocket',
+  'lockfile',
+];
+
+function isProfileLockError(err) {
+  const message = String(err && err.message ? err.message : err).toLowerCase();
+  return message.includes('singleton')
+    || message.includes('lock')
+    || message.includes('user data directory is already in use');
+}
+
+function clearBrowserProfileLocks(profileDir) {
+  const removed = [];
+
+  for (const fileName of BROWSER_PROFILE_LOCK_FILES) {
+    const filePath = path.join(profileDir, fileName);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        removed.push(fileName);
+      }
+    } catch {
+      // ignore cleanup failure and continue
+    }
+  }
+
+  return removed;
+}
+
+async function launchPersistentContext(launchOptions, bus) {
+  try {
+    return await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, launchOptions);
+  } catch (err) {
+    if (!isProfileLockError(err)) {
+      throw err;
+    }
+
+    const removedLocks = clearBrowserProfileLocks(BROWSER_PROFILE_DIR);
+    if (!removedLocks.length) {
+      throw err;
+    }
+
+    bus.sendLog(`检测到浏览器 profile 锁文件，已清理后重试: ${removedLocks.join(', ')}`);
+    return chromium.launchPersistentContext(BROWSER_PROFILE_DIR, launchOptions);
+  }
+}
 
 class Runner {
   constructor(bus, options) {
@@ -98,6 +153,11 @@ class Runner {
       // Launch headed Playwright browser
       this.bus.sendLog('启动 Playwright 浏览器...');
 
+      if (isLikelyWindowsSshSession()) {
+        this.bus.sendLog('检测到 Windows SSH 会话，浏览器窗口可能不会显示在用户桌面上。');
+        this.bus.sendLog(`如果用户看不到浏览器，请在桌面会话运行，或执行: ${getWindowsInteractiveTaskCommand()}`);
+      }
+
       // Keep a persistent browser profile so Feishu login can be reused.
       const launchOptions = {
         headless: false,
@@ -106,29 +166,19 @@ class Runner {
         locale: 'zh-CN',
       };
       try {
-        this.browser = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, launchOptions);
+        this.browser = await launchPersistentContext(launchOptions, this.bus);
       } catch {
-        this.bus.sendLog('Playwright 自带浏览器未安装，尝试使用系统 Chrome...');
-        // Common Chrome paths on macOS/Linux
-        const chromePaths = [
-          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-          '/usr/bin/google-chrome',
-          '/usr/bin/chromium-browser',
-          '/usr/bin/chromium',
-        ];
-        let found = false;
-        for (const p of chromePaths) {
-          if (fs.existsSync(p)) {
-            launchOptions.executablePath = p;
-            this.browser = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, launchOptions);
-            found = true;
-            this.bus.sendLog(`使用系统浏览器: ${p}`);
-            break;
-          }
+        this.bus.sendLog('Playwright 自带浏览器未安装，尝试使用系统 Chrome / Edge...');
+        const systemBrowserPath = findSystemBrowserExecutable();
+        if (!systemBrowserPath) {
+          throw new Error(
+            '未找到可用浏览器。请运行 npx playwright install chromium，或安装 Google Chrome / Microsoft Edge'
+          );
         }
-        if (!found) {
-          throw new Error('未找到可用浏览器。请运行 npx playwright install chromium 或安装 Google Chrome');
-        }
+
+        launchOptions.executablePath = systemBrowserPath;
+        this.browser = await launchPersistentContext(launchOptions, this.bus);
+        this.bus.sendLog(`使用系统浏览器: ${systemBrowserPath}`);
       }
 
       this.bus.sendLog(`使用持久化浏览器目录: ${BROWSER_PROFILE_DIR}`);

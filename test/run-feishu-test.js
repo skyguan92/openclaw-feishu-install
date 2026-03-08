@@ -12,6 +12,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { findSystemBrowserExecutable } = require('../src/utils/browser');
 
 // ── Mock setup ──────────────────────────────────────────────────────────
 const MOCK_OPENCLAW_DIR = path.join(os.tmpdir(), 'openclaw-test-' + Date.now());
@@ -146,17 +147,9 @@ class MockRunner extends OriginalRunner {
         args: ['--disable-blink-features=AutomationControlled'],
       };
 
-      // Use system Chrome
-      const chromePaths = [
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        '/usr/bin/google-chrome',
-        '/usr/bin/chromium-browser',
-      ];
-      for (const p of chromePaths) {
-        if (fs.existsSync(p)) {
-          launchOptions.executablePath = p;
-          break;
-        }
+      const systemBrowserPath = findSystemBrowserExecutable();
+      if (systemBrowserPath) {
+        launchOptions.executablePath = systemBrowserPath;
       }
 
       this.browser = await chromium.launch(launchOptions);

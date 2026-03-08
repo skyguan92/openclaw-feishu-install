@@ -1,6 +1,8 @@
 const {
+  getOpenClawLookupHint,
   openclawExists,
   repairLegacyConfig,
+  resolveOpenClawBinary,
   runOpenClawJson,
   setConfigValue,
 } = require('./openclaw-cli');
@@ -31,8 +33,14 @@ async function restartGateway(bus) {
   bus.sendLog('检查 OpenClaw Gateway 状态...');
 
   if (!openclawExists()) {
-    bus.sendLog('openclaw CLI 未安装，跳过 Gateway 自动启动');
+    bus.sendLog(getOpenClawLookupHint());
+    bus.sendLog('未找到 OpenClaw CLI，跳过 Gateway 自动启动');
     return;
+  }
+
+  const openclawBin = resolveOpenClawBinary();
+  if (openclawBin) {
+    bus.sendLog(`使用 OpenClaw CLI: ${openclawBin}`);
   }
 
   repairLegacyConfig(bus);

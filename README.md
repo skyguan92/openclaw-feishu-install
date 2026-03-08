@@ -12,7 +12,7 @@ Connecting Feishu (Lark) to OpenClaw manually is painful — you need to create 
 
 This tool automates all of it. Just run `npm start`, log into Feishu, and **everything is done in ~5 minutes**.
 
-It uses Playwright browser automation to drive the Feishu developer console end-to-end, with a local web UI showing real-time progress.
+It uses Playwright browser automation to drive the Feishu developer console end-to-end, with a local web UI showing real-time progress. The installer now supports macOS, Linux, and Windows.
 
 ### How it works
 
@@ -35,7 +35,7 @@ If anything fails mid-way, you can resume from where you left off — no need to
 - **OpenClaw** already installed and running (`openclaw` CLI must be on your `PATH`)
 - **Node.js** >= 18
 - **Feishu** developer account with admin or app-creation privileges
-- **Chromium** (auto-installed via Playwright, or falls back to system Chrome)
+- **Chromium** (auto-installed via Playwright, or falls back to system Chrome/Edge)
 
 ### Quick start
 
@@ -43,15 +43,35 @@ If anything fails mid-way, you can resume from where you left off — no need to
 git clone https://github.com/skyguan92/openclaw-feishu-install.git
 cd openclaw-feishu-install
 npm install
-npx playwright install chromium   # optional — falls back to system Chrome
+npx playwright install chromium   # optional — falls back to system Chrome/Edge
+npm start
+```
+
+On Windows PowerShell, the commands are the same:
+
+```powershell
+git clone https://github.com/skyguan92/openclaw-feishu-install.git
+cd openclaw-feishu-install
+npm install
+npx playwright install chromium   # optional — falls back to system Chrome/Edge
 npm start
 ```
 
 The web UI opens at `http://localhost:19090`. Fill in the app name and bot name, then click **Start Install**. A Chromium window will open for you to log into Feishu — after that, everything is automated.
 
+Windows notes:
+
+- If `openclaw` is installed but not visible in the current `PATH` (common under `schtasks` or SSH sessions), set `OPENCLAW_BIN` to the full CLI path, for example: `C:\\Users\\<you>\\AppData\\Roaming\\npm\\openclaw.cmd`
+- If you launch this tool through Windows SSH, the browser may open in a non-interactive session and be invisible to the desktop user. In that case, start it from the desktop session, or run it via `schtasks ... /it`
+
 ### Resumable state
 
-Installation state is saved to `~/.openclaw/.feishu-setup-state.json`. If the process is interrupted, re-running `npm start` will detect the incomplete state and offer to resume or start fresh.
+Installation state is saved under your home directory:
+
+- macOS / Linux: `~/.openclaw/.feishu-setup-state.json`
+- Windows: `%USERPROFILE%\\.openclaw\\.feishu-setup-state.json`
+
+If the process is interrupted, re-running `npm start` will detect the incomplete state and offer to resume or start fresh.
 
 ### Project structure
 
@@ -86,7 +106,7 @@ MIT
 
 这个工具把全部流程自动化了。运行 `npm start`，登录飞书，**5 分钟内全部搞定**。
 
-工具使用 Playwright 浏览器自动化驱动飞书开发者后台，配合本地 Web 界面实时展示进度。
+工具使用 Playwright 浏览器自动化驱动飞书开发者后台，配合本地 Web 界面实时展示进度。当前已兼容 macOS、Linux 和 Windows。
 
 ### 自动化流程
 
@@ -109,7 +129,7 @@ MIT
 - **OpenClaw** 已安装并运行（`openclaw` CLI 需在 `PATH` 中）
 - **Node.js** >= 18
 - **飞书**开发者账号，需具备管理员或应用创建权限
-- **Chromium**（Playwright 自动安装，或自动回退到系统 Chrome）
+- **Chromium**（Playwright 自动安装，或自动回退到系统 Chrome / Edge）
 
 ### 快速开始
 
@@ -117,15 +137,35 @@ MIT
 git clone https://github.com/skyguan92/openclaw-feishu-install.git
 cd openclaw-feishu-install
 npm install
-npx playwright install chromium   # 可选 — 会自动回退到系统 Chrome
+npx playwright install chromium   # 可选 — 会自动回退到系统 Chrome / Edge
+npm start
+```
+
+Windows PowerShell 下命令相同：
+
+```powershell
+git clone https://github.com/skyguan92/openclaw-feishu-install.git
+cd openclaw-feishu-install
+npm install
+npx playwright install chromium   # 可选 — 会自动回退到系统 Chrome / Edge
 npm start
 ```
 
 Web 界面在 `http://localhost:19090` 打开。填写应用名称和机器人名称，点击 **开始安装**。浏览器窗口会打开并引导你登录飞书，登录后全部流程自动完成。
 
+Windows 额外说明：
+
+- 如果 `openclaw` 已安装但当前会话找不到它（常见于 `schtasks` 或 SSH 会话），可以设置 `OPENCLAW_BIN` 指向完整路径，例如：`C:\\Users\\<你>\\AppData\\Roaming\\npm\\openclaw.cmd`
+- 如果你是通过 Windows SSH 启动本工具，浏览器可能会开在非交互式 session，桌面用户看不到窗口。这种情况下请直接在桌面会话运行，或改用 `schtasks ... /it`
+
 ### 断点恢复
 
-安装状态保存在 `~/.openclaw/.feishu-setup-state.json`。如果流程中断，重新运行 `npm start` 会检测到未完成状态，可以选择继续安装或重新开始。
+安装状态保存在当前用户主目录下：
+
+- macOS / Linux：`~/.openclaw/.feishu-setup-state.json`
+- Windows：`%USERPROFILE%\\.openclaw\\.feishu-setup-state.json`
+
+如果流程中断，重新运行 `npm start` 会检测到未完成状态，可以选择继续安装或重新开始。
 
 ### 项目结构
 

@@ -2,9 +2,7 @@ const S = require('./selectors');
 const { dismissModals } = require('./dismiss-modals');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const LOG_DIR = path.join(os.homedir(), '.openclaw', 'logs');
+const { LOG_DIR } = require('../utils/paths');
 
 async function configureEvents(page, bus, appId) {
   bus.sendPhase('events', 'running', '正在配置事件订阅...');

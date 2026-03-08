@@ -2,9 +2,7 @@ const S = require('./selectors');
 const { dismissModals } = require('./dismiss-modals');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const LOG_DIR = path.join(os.homedir(), '.openclaw', 'logs');
+const { LOG_DIR } = require('../utils/paths');
 const REQUIRED_SCOPES = Array.from(new Set(S.permissions.requiredScopes));
 const PERMISSION_IMPORT_JSON = JSON.stringify(S.permissions.importPayload, null, 2);
 const ENABLE_UNSAFE_SCOPE_FALLBACK = process.env.FEISHU_PERMISSION_UNSAFE_FALLBACK === '1';

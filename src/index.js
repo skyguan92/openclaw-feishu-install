@@ -1,5 +1,8 @@
 const { createApp } = require('./server/app');
-const path = require('path');
+const {
+  getWindowsInteractiveTaskCommand,
+  isLikelyWindowsSshSession,
+} = require('./utils/runtime-context');
 
 const PORT = 19090;
 
@@ -10,6 +13,14 @@ async function startServer() {
     const server = app.listen(PORT, async () => {
       const url = `http://localhost:${PORT}`;
       console.log(`OpenClaw Feishu Installer running at ${url}`);
+
+      if (isLikelyWindowsSshSession()) {
+        console.log('Detected a Windows SSH session. GUI browsers may not be visible on the desktop user session.');
+        console.log(`If the user cannot see the browser window, run this in an interactive task instead: ${getWindowsInteractiveTaskCommand()}`);
+        console.log(`Open ${url} manually after the task starts.`);
+        resolve(server);
+        return;
+      }
 
       // Dynamically import 'open' (ESM module)
       try {

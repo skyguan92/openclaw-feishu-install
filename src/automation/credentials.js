@@ -2,9 +2,7 @@ const S = require('./selectors');
 const { dismissModals } = require('./dismiss-modals');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const LOG_DIR = path.join(os.homedir(), '.openclaw', 'logs');
+const { LOG_DIR } = require('../utils/paths');
 const DEBUG_FILE = path.join(LOG_DIR, 'credentials-debug.log');
 const HTML_FILE = path.join(LOG_DIR, 'credentials-page.html');
 
@@ -271,7 +269,7 @@ async function extractCredentials(page, bus, appId) {
   debugLog(`Final result: ${appSecret ? 'SUCCESS' : 'FAILED'}`);
 
   if (!appSecret) {
-    throw new Error('无法提取 App Secret。请查看 ~/.openclaw/logs/credentials-debug.log');
+    throw new Error(`无法提取 App Secret。请查看 ${DEBUG_FILE}`);
   }
 
   bus.sendPhase('credentials', 'done', '凭证获取成功');

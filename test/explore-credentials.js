@@ -5,11 +5,13 @@
  */
 
 const { chromium } = require('playwright');
+const { findSystemBrowserExecutable } = require('../src/utils/browser');
 
 async function main() {
+  const executablePath = findSystemBrowserExecutable();
   const browser = await chromium.launch({
     headless: false,
-    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    executablePath,
     args: ['--disable-blink-features=AutomationControlled'],
   });
 

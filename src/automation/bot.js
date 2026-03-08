@@ -2,9 +2,7 @@ const S = require('./selectors');
 const { dismissModals } = require('./dismiss-modals');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-
-const LOG_DIR = path.join(os.homedir(), '.openclaw', 'logs');
+const { LOG_DIR } = require('../utils/paths');
 
 async function enableBot(page, bus, appId) {
   bus.sendPhase('bot', 'running', '正在开启机器人能力...');

@@ -1,20 +1,20 @@
 const fs = require('fs');
-const path = require('path');
-const os = require('os');
 const {
+  getOpenClawLookupHint,
   openclawExists,
   repairLegacyConfig,
+  resolveOpenClawBinary,
   runOpenClaw,
   setConfigValue,
 } = require('./openclaw-cli');
+const { STATE_FILE } = require('../utils/paths');
 
 const FEISHU_ACCOUNT_ID = 'default';
-const STATE_PATH = path.join(os.homedir(), '.openclaw', '.feishu-setup-state.json');
 
 function loadState() {
   try {
-    if (fs.existsSync(STATE_PATH)) {
-      return JSON.parse(fs.readFileSync(STATE_PATH, 'utf-8'));
+    if (fs.existsSync(STATE_FILE)) {
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
     }
   } catch {
     // corrupted
@@ -25,7 +25,12 @@ function loadState() {
 async function configureOpenClaw(bus, appId, appSecret, options = {}) {
   bus.sendLog('配置 OpenClaw 飞书连接...');
   if (!openclawExists()) {
-    throw new Error('openclaw CLI 未安装或不在 PATH 中');
+    throw new Error(getOpenClawLookupHint());
+  }
+
+  const openclawBin = resolveOpenClawBinary();
+  if (openclawBin) {
+    bus.sendLog(`使用 OpenClaw CLI: ${openclawBin}`);
   }
 
   repairLegacyConfig(bus);

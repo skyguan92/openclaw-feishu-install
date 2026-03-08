@@ -1,12 +1,13 @@
 const fs = require('fs');
-const path = require('path');
-const os = require('os');
 const {
   CONFIG_PATH,
+  getOpenClawLookupHint,
   hasLegacyGatewaysKey,
   openclawExists,
+  resolveOpenClawBinary,
   runOpenClawJson,
 } = require('./openclaw-cli');
+const { STATE_FILE } = require('../utils/paths');
 
 async function runPreflight() {
   const results = {
@@ -15,12 +16,14 @@ async function runPreflight() {
     gatewayReachable: false,
     hasPendingState: false,
     pendingState: null,
+    clawPath: null,
     errors: [],
   };
 
   results.clawInstalled = openclawExists();
+  results.clawPath = resolveOpenClawBinary();
   if (!results.clawInstalled) {
-    results.errors.push('openclaw CLI 未安装或不在 PATH 中');
+    results.errors.push(getOpenClawLookupHint());
   }
 
   results.configExists = fs.existsSync(CONFIG_PATH);
@@ -31,11 +34,10 @@ async function runPreflight() {
 
   results.gatewayReachable = await checkGateway();
 
-  const statePath = path.join(os.homedir(), '.openclaw', '.feishu-setup-state.json');
-  if (fs.existsSync(statePath)) {
+  if (fs.existsSync(STATE_FILE)) {
     try {
       results.hasPendingState = true;
-      results.pendingState = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+      results.pendingState = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
     } catch {
       // corrupted state
     }

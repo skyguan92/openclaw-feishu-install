@@ -6,7 +6,9 @@
 
 ## English
 
-Connecting Feishu (Lark) to [OpenClaw](https://github.com/nicepkg/openclaw) manually is painful — you need to create an app in the developer console, copy credentials, enable the bot, add 10+ permission scopes one by one, configure event subscriptions, wire everything into OpenClaw's config, restart the gateway, and finally publish. The whole process easily takes **~1 hour** if you're doing it for the first time.
+**Prerequisite:** You already have [OpenClaw](https://github.com/nicepkg/openclaw) installed and running on your machine.
+
+Connecting Feishu (Lark) to OpenClaw manually is painful — you need to create an app in the developer console, copy credentials, enable the bot, add 10+ permission scopes one by one, configure event subscriptions, wire everything into OpenClaw's config, restart the gateway, and finally publish. The whole process easily takes **~1 hour** if you're doing it for the first time.
 
 This tool automates all of it. Just run `npm start`, log into Feishu, and **everything is done in ~5 minutes**.
 
@@ -30,8 +32,8 @@ If anything fails mid-way, you can resume from where you left off — no need to
 
 ### Prerequisites
 
+- **OpenClaw** already installed and running (`openclaw` CLI must be on your `PATH`)
 - **Node.js** >= 18
-- **OpenClaw CLI** installed and on your `PATH`
 - **Feishu** developer account with admin or app-creation privileges
 - **Chromium** (auto-installed via Playwright, or falls back to system Chrome)
 
@@ -78,7 +80,9 @@ MIT
 
 ## 中文
 
-手动将飞书连接到 [OpenClaw](https://github.com/nicepkg/openclaw) 非常繁琐——你需要在开发者后台创建应用、复制凭证、启用机器人能力、逐个添加 10+ 项权限、配置事件订阅、把所有配置写入 OpenClaw、重启 Gateway、最后发布应用。第一次操作至少需要 **~1 小时**。
+**前提条件：** 你的机器上已经安装并运行了 [OpenClaw](https://github.com/nicepkg/openclaw)。
+
+手动将飞书连接到 OpenClaw 非常繁琐——你需要在开发者后台创建应用、复制凭证、启用机器人能力、逐个添加 10+ 项权限、配置事件订阅、把所有配置写入 OpenClaw、重启 Gateway、最后发布应用。第一次操作至少需要 **~1 小时**。
 
 这个工具把全部流程自动化了。运行 `npm start`，登录飞书，**5 分钟内全部搞定**。
 
@@ -102,8 +106,8 @@ MIT
 
 ### 前置要求
 
+- **OpenClaw** 已安装并运行（`openclaw` CLI 需在 `PATH` 中）
 - **Node.js** >= 18
-- **OpenClaw CLI** 已安装且在 `PATH` 中
 - **飞书**开发者账号，需具备管理员或应用创建权限
 - **Chromium**（Playwright 自动安装，或自动回退到系统 Chrome）
 

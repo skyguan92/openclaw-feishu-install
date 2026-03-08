@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-install",
+  "name": "openclaw-feishu-install",
   "version": "1.0.0",
   "description": "OpenClaw Feishu one-click installer - automates Feishu app creation and OpenClaw configuration",
   "bin": {

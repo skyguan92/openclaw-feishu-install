@@ -34,8 +34,8 @@ A local web UI (Express + WebSocket) shows real-time progress, and you can resum
 ### Quick start
 
 ```bash
-git clone https://github.com/skyguan92/openclaw-install.git
-cd openclaw-install
+git clone https://github.com/skyguan92/openclaw-feishu-install.git
+cd openclaw-feishu-install
 npm install
 npx playwright install chromium   # optional — falls back to system Chrome
 npm start
@@ -102,8 +102,8 @@ MIT
 ### 快速开始
 
 ```bash
-git clone https://github.com/skyguan92/openclaw-install.git
-cd openclaw-install
+git clone https://github.com/skyguan92/openclaw-feishu-install.git
+cd openclaw-feishu-install
 npm install
 npx playwright install chromium   # 可选 — 会自动回退到系统 Chrome
 npm start

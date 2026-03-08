@@ -1,0 +1,35 @@
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Scrollbar styling for log area */
+#log::-webkit-scrollbar {
+  width: 6px;
+}
+
+#log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#log::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+#log::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Input focus ring */
+input:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+/* Button hover transitions */
+button {
+  transition: background-color 0.15s ease;
+}

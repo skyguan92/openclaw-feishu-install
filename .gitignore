@@ -1,0 +1,6 @@
+node_modules/
+.playwright-mcp/
+test/explore-output/
+*.log
+*.png
+.DS_Store

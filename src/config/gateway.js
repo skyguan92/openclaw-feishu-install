@@ -13,6 +13,7 @@ const fs = require('fs');
 const net = require('net');
 const os = require('os');
 const path = require('path');
+const { LOG_DIR } = require('../utils/paths');
 
 const GATEWAY_LABEL = 'ai.openclaw.gateway';
 const GATEWAY_LAUNCH_AGENT_PATH = path.join(
@@ -29,7 +30,43 @@ const PROXY_ENV_KEYS = [
   'https_proxy',
   'all_proxy',
 ];
-const REQUIRED_NO_PROXY_HOSTS = ['127.0.0.1', 'localhost', 'open.feishu.cn'];
+const GATEWAY_LOG_PATH = path.join(LOG_DIR, 'gateway.log');
+const GATEWAY_ERR_LOG_PATH = path.join(LOG_DIR, 'gateway.err.log');
+const REQUIRED_NO_PROXY_HOSTS = [
+  '127.0.0.1',
+  'localhost',
+  'open.feishu.cn',
+  'openws.work.weixin.qq.com',
+  'work.weixin.qq.com',
+];
+
+function readLogLines(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return [];
+    }
+
+    return fs.readFileSync(filePath, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function extractLineTimestamp(line) {
+  const match = String(line || '').match(/^\d{4}-\d{2}-\d{2}T[0-9:.+-]+Z?/);
+  if (!match) {
+    return 0;
+  }
+
+  const value = Date.parse(match[0]);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getRecentLogLines(filePath, since) {
+  return readLogLines(filePath).filter((line) => extractLineTimestamp(line) >= since);
+}
 
 async function restartGateway(bus) {
   bus.sendLog('检查 OpenClaw Gateway 状态...');
@@ -245,6 +282,41 @@ async function findAvailablePort(startPort, maxAttempts = 50) {
   throw new Error(`未找到可用的 Gateway 端口（从 ${startPort} 起尝试了 ${maxAttempts} 个端口）`);
 }
 
+async function waitForWecomChannelConnected(bus, options = {}) {
+  const since = options.since || Date.now();
+  const timeoutMs = options.timeoutMs || 60000;
+  const deadline = Date.now() + timeoutMs;
+  const successPatterns = [
+    'Authentication successful',
+    'Received WebSocket protocol ping, sent pong',
+  ];
+  const errorPatterns = [
+    'Authentication failed',
+    'invalid open_botid',
+    'WebSocket error',
+  ];
+
+  while (Date.now() < deadline) {
+    const logLines = getRecentLogLines(GATEWAY_LOG_PATH, since).filter((line) => line.includes('[wecom]'));
+    const errLines = getRecentLogLines(GATEWAY_ERR_LOG_PATH, since).filter((line) => line.includes('[wecom]'));
+    const errorLine = [...errLines, ...logLines].find((line) => errorPatterns.some((pattern) => line.includes(pattern)));
+    if (errorLine) {
+      throw new Error(`企业微信长连接失败: ${errorLine}`);
+    }
+
+    const successLine = logLines.find((line) => successPatterns.some((pattern) => line.includes(pattern)));
+    if (successLine) {
+      bus.sendLog(`企业微信长连接已建立: ${successLine}`);
+      return true;
+    }
+
+    bus.sendLog('等待企业微信长连接握手完成...');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  throw new Error('未在 Gateway 日志中检测到企业微信长连接建立成功');
+}
+
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -388,7 +460,7 @@ function applyGatewayLaunchAgentEnvironment(bus, preservedEnv = null) {
     if (preservedEnv && Object.keys(preservedEnv).length > 0) {
       bus.sendLog('已恢复 Gateway LaunchAgent 中的自定义环境变量');
     } else {
-      bus.sendLog('已移除 Gateway 服务中的代理环境变量，并补充 NO_PROXY=open.feishu.cn');
+      bus.sendLog('已移除 Gateway 服务中的代理环境变量，并补充 Feishu / 企业微信所需的 NO_PROXY 域名');
     }
   }
 
@@ -467,4 +539,9 @@ function reloadGatewayLaunchAgent(bus) {
   }
 }
 
-module.exports = { restartGateway, getGatewayStatus, isGatewayReady };
+module.exports = {
+  restartGateway,
+  getGatewayStatus,
+  isGatewayReady,
+  waitForWecomChannelConnected,
+};

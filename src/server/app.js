@@ -4,7 +4,9 @@ const path = require('path');
 const { SSEBus } = require('./events');
 const runnerModule = require('../automation/runner');
 const preflightModule = require('../config/preflight');
-const { BROWSER_PROFILE_DIR, STATE_FILE } = require('../utils/paths');
+const stateModule = require('../config/state');
+const { getBrowserProfileDir } = require('../utils/paths');
+const { DEFAULT_CHANNEL, normalizeChannel } = require('../config/channels');
 
 function trimValue(value) {
   if (value == null) {
@@ -55,12 +57,20 @@ function createApp() {
     const savedState = require('../config/openclaw').loadState() || {};
 
     try {
+      const channel = normalizeChannel(
+        trimValue(req.body.channel) || trimValue(savedState.channel) || DEFAULT_CHANNEL,
+        DEFAULT_CHANNEL
+      );
       runner = new runnerModule.Runner(bus, {
+        channel,
         appName: trimValue(req.body.appName) || trimValue(savedState.appName),
         botName: trimValue(req.body.botName) || trimValue(savedState.botName),
         appDescription: trimValue(req.body.appDescription) || trimValue(savedState.appDescription),
         appId: trimValue(req.body.appId) || trimValue(savedState.appId),
         appSecret: trimValue(req.body.appSecret) || trimValue(savedState.appSecret),
+        botId: trimValue(req.body.botId) || trimValue(savedState.botId),
+        botSecret: trimValue(req.body.botSecret) || trimValue(savedState.botSecret),
+        websocketUrl: trimValue(req.body.websocketUrl) || trimValue(savedState.websocketUrl),
         startPhase: trimValue(req.body.startPhase),
         endPhase: trimValue(req.body.endPhase),
         clearLogin: Boolean(req.body.clearLogin),
@@ -72,6 +82,7 @@ function createApp() {
 
     res.json({
       status: 'started',
+      channel: runner.channel,
       startPhase: runner.startPhase,
       endPhase: runner.endPhase,
       selectedPhases: runner.selectedPhases,
@@ -108,13 +119,18 @@ function createApp() {
 
   // Get saved state (for resume)
   app.get('/api/state', async (req, res) => {
-    const ocConfig = require('../config/openclaw');
-    const state = ocConfig.loadState();
-    res.json({
-      ...(state || {}),
-      phases: runnerModule.PHASES,
-      running: Boolean(runner && runner.running),
-    });
+    try {
+      const requestedChannel = trimValue(req.query.channel);
+      const state = stateModule.loadState({
+        channel: requestedChannel ? normalizeChannel(requestedChannel, DEFAULT_CHANNEL) : undefined,
+      });
+      res.json({
+        ...(state || {}),
+        running: Boolean(runner && runner.running),
+      });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   app.post('/api/reset', async (req, res) => {
@@ -122,12 +138,17 @@ function createApp() {
       return res.status(409).json({ error: 'Automation is already running' });
     }
 
-    const clearedState = removePathIfExists(STATE_FILE);
-    const clearedLogin = req.body && req.body.clearLogin
-      ? removePathIfExists(BROWSER_PROFILE_DIR)
-      : false;
+    try {
+      const channel = trimValue(req.body.channel || (runner && runner.channel) || stateModule.loadState()?.channel || DEFAULT_CHANNEL);
+      const clearedState = stateModule.clearState();
+      const clearedLogin = req.body && req.body.clearLogin
+        ? removePathIfExists(getBrowserProfileDir(normalizeChannel(channel, DEFAULT_CHANNEL)))
+        : false;
 
-    res.json({ status: 'reset', clearedState, clearedLogin });
+      res.json({ status: 'reset', clearedState, clearedLogin });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   app.post('/api/reset-login', async (req, res) => {
@@ -135,8 +156,14 @@ function createApp() {
       return res.status(409).json({ error: 'Automation is already running' });
     }
 
-    const cleared = removePathIfExists(BROWSER_PROFILE_DIR);
-    res.json({ status: 'login-reset', cleared });
+    try {
+      const channel = trimValue(req.body && req.body.channel) || stateModule.loadState()?.channel || DEFAULT_CHANNEL;
+      const normalizedChannel = normalizeChannel(channel, DEFAULT_CHANNEL);
+      const cleared = removePathIfExists(getBrowserProfileDir(normalizedChannel));
+      res.json({ status: 'login-reset', cleared });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   return app;

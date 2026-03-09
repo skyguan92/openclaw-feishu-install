@@ -1,4 +1,4 @@
-# OpenClaw Feishu Installer
+# OpenClaw Channel Installer
 
 [中文](#中文) | [English](#english)
 
@@ -8,9 +8,14 @@
 
 **Prerequisite:** You already have [OpenClaw](https://github.com/nicepkg/openclaw) installed and running on your machine.
 
+This installer now supports two channel entry paths:
+
+- **Feishu / Lark**: full Playwright automation for app creation, permissions, event subscriptions, and OpenClaw wiring
+- **WeCom / 企业微信**: QR-login automation for the new long-connection intelligent bot mode; it creates the bot, extracts Bot ID / Secret, writes OpenClaw config, and restarts the gateway automatically
+
 Connecting Feishu (Lark) to OpenClaw manually is painful — you need to create an app in the developer console, copy credentials, enable the bot, add 10+ permission scopes one by one, configure event subscriptions, wire everything into OpenClaw's config, restart the gateway, and finally publish. The whole process easily takes **~1 hour** if you're doing it for the first time.
 
-This tool automates all of it. Just run `npm start`, log into Feishu, and **everything is done in ~5 minutes**.
+This tool automates the Feishu path end-to-end, and also adds a WeCom entry option for the new long-connection bot mode. Run `npm start`, choose your channel in the web UI, and follow the matching flow. For WeCom, you now only need to provide a bot name and scan the admin QR code once.
 
 It uses Playwright browser automation to drive the Feishu developer console end-to-end, with a local web UI showing real-time progress. The installer now supports macOS, Linux, and Windows.
 
@@ -121,9 +126,14 @@ Apache-2.0
 
 **前提条件：** 你的机器上已经安装并运行了 [OpenClaw](https://github.com/nicepkg/openclaw)。
 
+安装器现在支持两条接入路径：
+
+- **飞书**：继续提供完整的 Playwright 自动化建应用流程
+- **企业微信**：新增智能机器人长连接接入；只需要给机器人命名并扫码，安装器会自动创建机器人、提取 Bot ID / Secret、写入 OpenClaw 并重启 Gateway
+
 手动将飞书连接到 OpenClaw 非常繁琐——你需要在开发者后台创建应用、复制凭证、启用机器人能力、逐个添加 10+ 项权限、配置事件订阅、把所有配置写入 OpenClaw、重启 Gateway、最后发布应用。第一次操作至少需要 **~1 小时**。
 
-这个工具把全部流程自动化了。运行 `npm start`，登录飞书，**5 分钟内全部搞定**。
+这个工具把飞书全链路自动化了，同时新增了企业微信长连接接入入口。运行 `npm start` 后，在页面里选择渠道并走对应流程即可。企业微信路径现在不再要求手工填写凭证。
 
 工具使用 Playwright 浏览器自动化驱动飞书开发者后台，配合本地 Web 界面实时展示进度。当前已兼容 macOS、Linux 和 Windows。
 

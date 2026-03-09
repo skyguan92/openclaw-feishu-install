@@ -7,7 +7,7 @@ const {
   resolveOpenClawBinary,
   runOpenClawJson,
 } = require('./openclaw-cli');
-const { STATE_FILE } = require('../utils/paths');
+const stateModule = require('./state');
 
 async function runPreflight() {
   const results = {
@@ -34,13 +34,10 @@ async function runPreflight() {
 
   results.gatewayReachable = await checkGateway();
 
-  if (fs.existsSync(STATE_FILE)) {
-    try {
-      results.hasPendingState = true;
-      results.pendingState = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
-    } catch {
-      // corrupted state
-    }
+  const pendingState = stateModule.loadState();
+  if (pendingState) {
+    results.hasPendingState = true;
+    results.pendingState = pendingState;
   }
 
   return results;

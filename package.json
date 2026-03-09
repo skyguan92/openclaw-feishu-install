@@ -1,7 +1,7 @@
 {
   "name": "openclaw-feishu-install",
   "version": "1.0.0",
-  "description": "OpenClaw Feishu one-click installer - automates Feishu app creation and OpenClaw configuration",
+  "description": "OpenClaw multi-channel installer - automates Feishu setup and WeCom long-connection onboarding",
   "bin": {
     "openclaw-install": "./bin/cli.js"
   },

@@ -9,7 +9,7 @@ function getWindowsInteractiveTaskCommand(cwd = process.cwd()) {
   const workdir = /^[A-Za-z]:[\\/]/.test(cwd) || cwd.startsWith('\\\\')
     ? cwd.replace(/\//g, '\\')
     : path.resolve(cwd);
-  return `schtasks /create /tn "OpenClawFeishu" /tr "cmd /c cd /d ""${workdir}"" && node bin/cli.js" /sc once /st 00:00 /f /ru %USERNAME% /it && schtasks /run /tn "OpenClawFeishu"`;
+  return `schtasks /create /tn "OpenClawInstaller" /tr "cmd /c cd /d ""${workdir}"" && node bin/cli.js" /sc once /st 00:00 /f /ru %USERNAME% /it && schtasks /run /tn "OpenClawInstaller"`;
 }
 
 module.exports = {

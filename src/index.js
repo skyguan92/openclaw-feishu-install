@@ -12,7 +12,7 @@ async function startServer() {
   return new Promise((resolve, reject) => {
     const server = app.listen(PORT, async () => {
       const url = `http://localhost:${PORT}`;
-      console.log(`OpenClaw Feishu Installer running at ${url}`);
+      console.log(`OpenClaw Channel Installer running at ${url}`);
 
       if (isLikelyWindowsSshSession()) {
         console.log('Detected a Windows SSH session. GUI browsers may not be visible on the desktop user session.');

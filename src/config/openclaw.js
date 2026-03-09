@@ -10,22 +10,15 @@ const {
   runOpenClaw,
   setConfigValue,
 } = require('./openclaw-cli');
-const { STATE_FILE } = require('../utils/paths');
+const stateModule = require('./state');
 
 const FEISHU_ACCOUNT_ID = 'default';
 
 function loadState() {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
-    }
-  } catch {
-    // corrupted
-  }
-  return null;
+  return stateModule.loadState();
 }
 
-async function configureOpenClaw(bus, appId, appSecret, options = {}) {
+async function configureFeishuOpenClaw(bus, appId, appSecret, options = {}) {
   bus.sendLog('配置 OpenClaw 飞书连接...');
   if (!openclawExists()) {
     throw new Error(getOpenClawLookupHint());
@@ -55,6 +48,36 @@ async function configureOpenClaw(bus, appId, appSecret, options = {}) {
   runOpenClaw(['config', 'validate'], { timeout: 60000 });
 
   bus.sendLog('已写入 channels.feishu.* 配置，默认关闭 streaming card，并设置 gateway.mode=local');
+}
+
+async function configureWecomOpenClaw(bus, botId, botSecret, options = {}) {
+  bus.sendLog('配置 OpenClaw 企业微信连接...');
+  if (!openclawExists()) {
+    throw new Error(getOpenClawLookupHint());
+  }
+
+  const openclawBin = resolveOpenClawBinary();
+  if (openclawBin) {
+    bus.sendLog(`使用 OpenClaw CLI: ${openclawBin}`);
+  }
+
+  repairLegacyConfig(bus);
+  ensureWecomPlugin(bus);
+
+  setConfigValue('gateway.mode', 'local');
+  setConfigValue('channels.wecom.enabled', true);
+  setConfigValue('channels.wecom.botId', botId);
+  setConfigValue('channels.wecom.secret', botSecret);
+  if (options.botName) {
+    setConfigValue('channels.wecom.name', options.botName);
+  }
+  if (options.websocketUrl) {
+    setConfigValue('channels.wecom.websocketUrl', options.websocketUrl);
+  }
+
+  runOpenClaw(['config', 'validate'], { timeout: 60000 });
+
+  bus.sendLog('已写入 channels.wecom.* 配置，使用企业微信智能机器人长连接模式');
 }
 
 function ensureFeishuPlugin(bus) {
@@ -114,4 +137,24 @@ function ensureFeishuSdk(bus) {
   bus.sendLog('飞书 SDK 补装完成');
 }
 
-module.exports = { configureOpenClaw, loadState };
+function ensureWecomPlugin(bus) {
+  try {
+    runOpenClaw(['plugins', 'enable', 'wecom-openclaw-plugin'], { timeout: 60000 });
+    bus.sendLog('企业微信插件已启用');
+  } catch (enableErr) {
+    bus.sendLog('未检测到企业微信插件，尝试安装 @wecom/wecom-openclaw-plugin...');
+    runOpenClaw(['plugins', 'install', '@wecom/wecom-openclaw-plugin'], { timeout: 180000 });
+    try {
+      runOpenClaw(['plugins', 'enable', 'wecom-openclaw-plugin'], { timeout: 60000 });
+    } catch {
+      // some plugin installs are auto-enabled; continue to validation below
+    }
+    bus.sendLog('企业微信插件安装完成');
+  }
+}
+
+module.exports = {
+  configureFeishuOpenClaw,
+  configureWecomOpenClaw,
+  loadState,
+};

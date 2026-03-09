@@ -7,6 +7,7 @@ const LOG_DIR = path.join(OPENCLAW_HOME, 'logs');
 const LEGACY_FEISHU_STATE_FILE = path.join(OPENCLAW_HOME, '.feishu-setup-state.json');
 const STATE_FILE = path.join(OPENCLAW_HOME, '.channel-setup-state.json');
 const CONFIG_PATH = path.join(OPENCLAW_HOME, 'openclaw.json');
+const MAIN_AGENT_AUTH_PROFILES_PATH = path.join(OPENCLAW_HOME, 'agents', 'main', 'agent', 'auth-profiles.json');
 const SCREENSHOT_DIR = path.join(LOG_DIR, 'setup-screenshots');
 
 function getBrowserProfileDir(channel = DEFAULT_CHANNEL) {
@@ -18,6 +19,7 @@ module.exports = {
   getBrowserProfileDir,
   LEGACY_FEISHU_STATE_FILE,
   LOG_DIR,
+  MAIN_AGENT_AUTH_PROFILES_PATH,
   OPENCLAW_HOME,
   SCREENSHOT_DIR,
   STATE_FILE,

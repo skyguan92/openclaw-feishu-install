@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const { execFileSync, spawnSync } = require('child_process');
 const path = require('path');
+const { CONFIG_PATH } = require('../utils/paths');
 const {
   getOpenClawLookupHint,
   openclawExists,
@@ -15,9 +16,39 @@ const stateModule = require('./state');
 
 const FEISHU_ACCOUNT_ID = 'default';
 const WINDOWS_SHELL = process.env.ComSpec || 'cmd.exe';
+const WECOM_PLUGIN_ID = 'wecom-openclaw-plugin';
+const WECOM_PLUGIN_PACKAGE = '@wecom/wecom-openclaw-plugin';
 
 function loadState() {
   return stateModule.loadState();
+}
+
+function ensurePluginAllowList(bus, requiredPluginIds) {
+  const normalizedRequired = Array.from(new Set(requiredPluginIds.filter(Boolean)));
+  if (!normalizedRequired.length) {
+    return;
+  }
+
+  let currentAllow = [];
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.plugins?.allow)) {
+      currentAllow = parsed.plugins.allow.filter((value) => typeof value === 'string' && value.trim());
+    }
+  } catch {
+    // ignore config read failures and fall back to required list only
+  }
+
+  const nextAllow = Array.from(new Set([...currentAllow, ...normalizedRequired]));
+  if (!nextAllow.length) {
+    return;
+  }
+
+  setConfigValue('plugins.allow', nextAllow);
+  if (bus) {
+    bus.sendLog(`已同步 OpenClaw plugins.allow: ${nextAllow.join(', ')}`);
+  }
 }
 
 async function configureFeishuOpenClaw(bus, appId, appSecret, options = {}) {
@@ -35,6 +66,7 @@ async function configureFeishuOpenClaw(bus, appId, appSecret, options = {}) {
 
   ensureFeishuPlugin(bus);
   ensureFeishuSdk(bus);
+  ensurePluginAllowList(bus, ['feishu']);
 
   setConfigValue('gateway.mode', 'local');
   setConfigValue('channels.feishu.enabled', true);
@@ -78,6 +110,7 @@ async function configureWecomOpenClaw(bus, botId, botSecret, options = {}) {
 
   repairLegacyConfig(bus);
   ensureWecomPlugin(bus);
+  ensurePluginAllowList(bus, [WECOM_PLUGIN_ID]);
 
   setConfigValue('gateway.mode', 'local');
   setConfigValue('channels.wecom.enabled', true);
@@ -253,13 +286,13 @@ function copyDirectoryContents(sourceDir, targetDir) {
 
 function ensureWecomPlugin(bus) {
   try {
-    runOpenClaw(['plugins', 'enable', 'wecom-openclaw-plugin'], { timeout: 60000 });
+    runOpenClaw(['plugins', 'enable', WECOM_PLUGIN_ID], { timeout: 60000 });
     bus.sendLog('企业微信插件已启用');
   } catch (enableErr) {
-    bus.sendLog('未检测到企业微信插件，尝试安装 @wecom/wecom-openclaw-plugin...');
-    runOpenClaw(['plugins', 'install', '@wecom/wecom-openclaw-plugin'], { timeout: 180000 });
+    bus.sendLog(`未检测到企业微信插件，尝试安装 ${WECOM_PLUGIN_PACKAGE}...`);
+    runOpenClaw(['plugins', 'install', WECOM_PLUGIN_PACKAGE], { timeout: 180000 });
     try {
-      runOpenClaw(['plugins', 'enable', 'wecom-openclaw-plugin'], { timeout: 60000 });
+      runOpenClaw(['plugins', 'enable', WECOM_PLUGIN_ID], { timeout: 60000 });
     } catch {
       // some plugin installs are auto-enabled; continue to validation below
     }

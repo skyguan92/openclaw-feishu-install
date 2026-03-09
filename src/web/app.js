@@ -2,7 +2,7 @@ const CHANNELS = {
   feishu: {
     id: 'feishu',
     title: '飞书',
-    subtitle: '自动创建飞书应用并配置 OpenClaw 连接',
+    subtitle: '只需填写名称并扫码登录，剩余步骤由 AI 自动完成',
     accentClass: 'text-blue-400',
     buttonClass: ['bg-blue-600', 'hover:bg-blue-500'],
     botNameRequired: true,
@@ -20,6 +20,7 @@ const CHANNELS = {
       'restart_gateway',
       'events',
       'publish',
+      'post_publish_message',
     ],
     phaseLabels: {
       login: '登录飞书',
@@ -31,12 +32,13 @@ const CHANNELS = {
       restart_gateway: '重启 Gateway',
       events: '事件订阅',
       publish: '发布应用',
+      post_publish_message: '发送首条消息',
     },
   },
   wecom: {
     id: 'wecom',
     title: '企业微信',
-    subtitle: '扫码后自动创建企业微信智能机器人并接入 OpenClaw',
+    subtitle: '只需填写名称并扫码登录，剩余步骤由 AI 自动完成',
     accentClass: 'text-emerald-400',
     buttonClass: ['bg-emerald-600', 'hover:bg-emerald-500'],
     botNameRequired: true,
@@ -72,6 +74,7 @@ let pendingState = null;
 
 window.addEventListener('DOMContentLoaded', async () => {
   applyChannelUI(getCurrentChannel());
+  bindDerivedNameBehavior();
   await checkPreflight();
   await checkState();
 });
@@ -94,20 +97,37 @@ async function checkPreflight() {
   try {
     const res = await fetch('/api/preflight');
     const data = await res.json();
-
-    if (data.errors && data.errors.length > 0) {
-      const alerts = document.getElementById('preflight-alerts');
-      alerts.classList.remove('hidden');
-      alerts.replaceChildren();
-      for (const errMsg of data.errors) {
-        const div = document.createElement('div');
-        div.className = 'bg-red-900/30 border border-red-800 rounded-lg p-3 mb-2 text-red-300 text-sm';
-        div.textContent = errMsg;
-        alerts.appendChild(div);
-      }
-    }
+    renderPreflightAlerts(data);
   } catch {
     // preflight failed, continue anyway
+  }
+}
+
+function renderPreflightAlerts(data = {}) {
+  const alerts = document.getElementById('preflight-alerts');
+  const errors = Array.isArray(data.errors) ? data.errors : [];
+  const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+
+  alerts.replaceChildren();
+  if (!errors.length && !warnings.length) {
+    alerts.classList.add('hidden');
+    return;
+  }
+
+  alerts.classList.remove('hidden');
+
+  for (const warningMsg of warnings) {
+    const div = document.createElement('div');
+    div.className = 'bg-yellow-900/30 border border-yellow-800 rounded-lg p-3 mb-2 text-yellow-200 text-sm';
+    div.textContent = warningMsg;
+    alerts.appendChild(div);
+  }
+
+  for (const errMsg of errors) {
+    const div = document.createElement('div');
+    div.className = 'bg-red-900/30 border border-red-800 rounded-lg p-3 mb-2 text-red-300 text-sm';
+    div.textContent = errMsg;
+    alerts.appendChild(div);
   }
 }
 
@@ -173,12 +193,15 @@ function applyStateToForm(state) {
   if (state.websocketUrl) {
     document.getElementById('wecom-websocket-url').value = state.websocketUrl;
   }
+
+  syncDerivedBotName();
 }
 
 function handleChannelChange() {
   applyChannelUI(getCurrentChannel());
   refreshResumeBanner();
   clearFormError();
+  syncDerivedBotName();
 }
 
 function applyChannelUI(channel) {
@@ -190,12 +213,15 @@ function applyChannelUI(channel) {
 
   document.getElementById('feishu-fields').classList.toggle('hidden', channel !== 'feishu');
   document.getElementById('wecom-fields').classList.toggle('hidden', channel !== 'wecom');
+  document.getElementById('advanced-feishu-fields').classList.toggle('hidden', channel !== 'feishu');
+  document.getElementById('advanced-wecom-fields').classList.toggle('hidden', channel !== 'wecom');
   document.getElementById('feishu-recovery-fields').classList.toggle('hidden', channel !== 'feishu');
   document.getElementById('clear-login-row').classList.toggle('hidden', !config.supportsBrowserLogin);
+  document.getElementById('bot-name-row').classList.toggle('hidden', channel === 'feishu');
 
   const botLabel = document.getElementById('bot-name-label');
   const botRequired = document.getElementById('bot-name-required');
-  botLabel.childNodes[0].textContent = channel === 'wecom' ? '机器人名称 ' : '机器人名称 ';
+  botLabel.childNodes[0].textContent = channel === 'wecom' ? 'OpenClaw 名称 ' : '机器人名称 ';
   botRequired.classList.toggle('hidden', !config.botNameRequired);
 
   document.getElementById('resume-clear-login-btn').textContent = config.resumeClearLabel;
@@ -212,13 +238,38 @@ function applyChannelUI(channel) {
   for (const cls of config.buttonClass) {
     startBtn.classList.add(cls);
   }
-  startBtn.textContent = channel === 'wecom' ? '开始接入企业微信' : '开始安装';
+  startBtn.textContent = channel === 'wecom' ? '开始接入企业微信' : '开始自动安装';
 
   if (!config.supportsBrowserLogin) {
     document.getElementById('clear-login').checked = false;
   }
 
   renderPhaseSelects(channel);
+}
+
+function bindDerivedNameBehavior() {
+  const appNameInput = document.getElementById('app-name');
+  const botNameInput = document.getElementById('bot-name');
+
+  appNameInput.addEventListener('input', () => {
+    if (!botNameInput.dataset.touched || !botNameInput.value.trim()) {
+      botNameInput.value = appNameInput.value;
+    }
+  });
+
+  botNameInput.addEventListener('input', () => {
+    botNameInput.dataset.touched = 'true';
+  });
+
+  syncDerivedBotName();
+}
+
+function syncDerivedBotName() {
+  const appNameInput = document.getElementById('app-name');
+  const botNameInput = document.getElementById('bot-name');
+  if (!botNameInput.value.trim()) {
+    botNameInput.value = appNameInput.value;
+  }
 }
 
 function renderPhaseSelects(channel = getCurrentChannel()) {
@@ -267,10 +318,15 @@ async function freshInstall() {
 }
 
 function collectPayload() {
+  const channel = getCurrentChannel();
+  const appName = document.getElementById('app-name').value.trim();
+  const rawBotName = document.getElementById('bot-name').value.trim();
+  const botName = rawBotName || appName;
+
   return {
-    channel: getCurrentChannel(),
-    appName: document.getElementById('app-name').value.trim(),
-    botName: document.getElementById('bot-name').value.trim(),
+    channel,
+    appName,
+    botName: channel === 'feishu' ? botName : rawBotName,
     appDescription: document.getElementById('app-desc').value.trim(),
     appId: document.getElementById('existing-app-id').value.trim(),
     appSecret: document.getElementById('existing-app-secret').value.trim(),
@@ -293,15 +349,9 @@ function startInstall() {
 
   if (payload.channel === 'feishu') {
     const needsAppName = payload.startPhase === '' || startIndex <= config.phases.indexOf('create_app');
-    const needsBotName = payload.startPhase === '' || startIndex <= config.phases.indexOf('bot');
 
     if (needsAppName && !payload.appName && !(pending && pending.appName)) {
-      showFormError('执行创建应用相关步骤时，需要填写应用名称');
-      return;
-    }
-
-    if (needsBotName && !payload.botName && !(pending && pending.botName)) {
-      showFormError('执行机器人相关步骤时，需要填写机器人名称');
+      showFormError('执行飞书安装前，需要先填写 OpenClaw 名称');
       return;
     }
   } else {
@@ -311,7 +361,7 @@ function startInstall() {
     const needsBotCredentials = payload.startPhase !== '' && startIndex > createBotIndex && startIndex <= configureIndex;
 
     if (needsBotCreation && !payload.botName && !(pending && pending.botName)) {
-      showFormError('执行企业微信机器人创建前，需要填写机器人名称');
+      showFormError('执行企业微信接入前，需要先填写 OpenClaw 名称');
       return;
     }
 

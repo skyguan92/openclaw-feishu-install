@@ -21,7 +21,7 @@ It uses Playwright browser automation to drive the Feishu developer console end-
 
 ### How it works
 
-The installer runs through 9 phases automatically:
+The installer runs through 10 phases automatically:
 
 1. **Login** — Opens the Feishu developer console and waits for you to log in
 2. **Create App** — Creates a new enterprise custom app with your chosen name
@@ -32,6 +32,7 @@ The installer runs through 9 phases automatically:
 7. **Restart Gateway** — Restarts the OpenClaw gateway to pick up new config
 8. **Event Subscriptions** — Configures webhook/WebSocket event callbacks
 9. **Publish** — Submits the app for release within your organization
+10. **Send First DM** — Calls the Feishu Open API to proactively send the operator a first message
 
 If anything fails mid-way, you can resume from where you left off, rerun from any specific phase, or stop at a chosen phase for modular use.
 
@@ -39,6 +40,7 @@ Notable defaults in the Feishu flow:
 
 - `configure_openclaw` now auto-enables the Feishu plugin and backfills `@larksuiteoapi/node-sdk`. It prefers installing into `extensions/feishu/` and falls back to an isolated temp install + copy if the global OpenClaw package tree is hostile to `npm install`.
 - The default is still Feishu `pairing`, so the first private message requires `openclaw pairing approve`.
+- After publish, the installer now attempts to message the current operator automatically via `/open-apis/contact/v3/scopes` and `/open-apis/im/v1/messages`, so the user can find the bot entry immediately.
 - The UI keeps an explicit "skip first DM pairing" quick mode for personal-only bots. If enabled, it writes `channels.feishu.dmPolicy="open"` plus `allowFrom=["*"]`, so users inside the app's Feishu availability scope can talk to the bot immediately.
 - Do not enable that quick mode for shared or enterprise-wide bots unless you deliberately accept the exposure.
 - Feishu "available range" is still not automated. After publish, if other members cannot find the bot, add people or departments in "Version Management & Release -> Available Range" and publish again.
@@ -70,7 +72,7 @@ npx playwright install chromium   # optional — falls back to system Chrome/Edg
 npm start
 ```
 
-The web UI opens at `http://localhost:19090`. Fill in the app name and bot name, then click **Start Install**. A Chromium window will open for you to log into Feishu — after that, everything is automated.
+The web UI opens at `http://localhost:19090`. In the default flow you only need to enter one OpenClaw name and click **Start Install**. The browser will open for QR login, and the remaining app creation / permission / event / publish / first-message steps are automated.
 
 Windows notes:
 
@@ -99,7 +101,7 @@ Useful API calls:
 ```bash
 curl -X POST http://localhost:19090/api/start \
   -H 'Content-Type: application/json' \
-  -d '{"startPhase":"restart_gateway","endPhase":"publish"}'
+  -d '{"startPhase":"restart_gateway","endPhase":"post_publish_message"}'
 
 curl -X POST http://localhost:19090/api/reset
 curl -X POST http://localhost:19090/api/reset-login
@@ -120,6 +122,7 @@ src/automation/         # Playwright automation phases
   ├── permissions.js    # Permission scope configuration
   ├── events-subscription.js  # Event callback setup
   ├── publish.js        # App publishing
+  ├── post-publish-message.js # First DM after publish
   └── runner.js         # Phase orchestrator with state management
 src/config/             # OpenClaw CLI integration & gateway management
 ```
@@ -147,7 +150,7 @@ Apache-2.0
 
 ### 自动化流程
 
-安装器自动执行 9 个阶段：
+安装器自动执行 10 个阶段：
 
 1. **登录** — 打开飞书开发者后台，等待用户登录
 2. **创建应用** — 使用你指定的名称创建企业自建应用
@@ -158,6 +161,7 @@ Apache-2.0
 7. **重启 Gateway** — 重启 OpenClaw Gateway 使新配置生效
 8. **事件订阅** — 配置 Webhook/WebSocket 事件回调
 9. **发布应用** — 提交应用发布到企业内部
+10. **发送首条消息** — 调用飞书 Open API 主动给当前操作者发一条私信
 
 中途失败可以从断点恢复，也可以指定从某个阶段重新开始，或者只执行到某个阶段后暂停，方便模块化使用。
 
@@ -165,6 +169,7 @@ Apache-2.0
 
 - `configure_openclaw` 现在会自动启用飞书插件并补装 `@larksuiteoapi/node-sdk`。它优先在 `extensions/feishu/` 下安装；如果 OpenClaw 全局包目录的 `npm install` 环境很脏，会自动退回到“临时目录隔离安装后复制依赖”的方式。
 - 默认仍保留飞书 `pairing`，因此第一次私聊仍需要执行 `openclaw pairing approve`。
+- 发布完成后，安装器会额外调用 `/open-apis/contact/v3/scopes` 和 `/open-apis/im/v1/messages`，主动把首条私信发给当前操作者，方便用户马上定位到机器人入口。
 - Web UI 保留了显式“跳过首次私聊配对”快速模式；仅当你明确在做个人自用机器人时再勾选。勾选后会写入 `channels.feishu.dmPolicy="open"` 和 `allowFrom=["*"]`，让应用可用范围内的用户第一次私聊就能直接使用。
 - 如果你在接入共享机器人或企业内多人可见机器人，不要开启这个快速模式。
 - 飞书“可用范围”仍然不能自动化。发布后如果其他成员搜不到机器人，需要到“版本管理与发布 -> 可用范围”里手动加人或部门，再重新发布一次。
@@ -196,7 +201,7 @@ npx playwright install chromium   # 可选 — 会自动回退到系统 Chrome /
 npm start
 ```
 
-Web 界面在 `http://localhost:19090` 打开。填写应用名称和机器人名称，点击 **开始安装**。浏览器窗口会打开并引导你登录飞书，登录后全部流程自动完成。
+Web 界面在 `http://localhost:19090` 打开。默认只需要填写一个 OpenClaw 名称并点击 **开始自动安装**。浏览器窗口会打开并引导你扫码登录，后续创建应用、权限、事件、OpenClaw 配置、发布和首条消息发送都会自动完成。
 
 Windows 额外说明：
 
@@ -225,7 +230,7 @@ Windows 额外说明：
 ```bash
 curl -X POST http://localhost:19090/api/start \
   -H 'Content-Type: application/json' \
-  -d '{"startPhase":"restart_gateway","endPhase":"publish"}'
+  -d '{"startPhase":"restart_gateway","endPhase":"post_publish_message"}'
 
 curl -X POST http://localhost:19090/api/reset
 curl -X POST http://localhost:19090/api/reset-login
@@ -246,6 +251,7 @@ src/automation/         # Playwright 自动化各阶段
   ├── permissions.js    # 权限范围配置
   ├── events-subscription.js  # 事件回调配置
   ├── publish.js        # 应用发布
+  ├── post-publish-message.js # 发布后发送首条私信
   └── runner.js         # 阶段编排器（含状态管理）
 src/config/             # OpenClaw CLI 集成 & Gateway 管理
 ```

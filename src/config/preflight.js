@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { MAIN_AGENT_AUTH_PROFILES_PATH } = require('../utils/paths');
 const {
   CONFIG_PATH,
   getOpenClawLookupHint,
@@ -18,6 +19,7 @@ async function runPreflight() {
     pendingState: null,
     clawPath: null,
     errors: [],
+    warnings: [],
   };
 
   results.clawInstalled = openclawExists();
@@ -30,6 +32,12 @@ async function runPreflight() {
 
   if (results.configExists && hasLegacyGatewaysKey()) {
     results.errors.push('检测到旧版 OpenClaw 配置（根级 gateways 字段），启动安装时会自动迁移');
+  }
+
+  if (!fs.existsSync(MAIN_AGENT_AUTH_PROFILES_PATH)) {
+    results.warnings.push(
+      `检测到 OpenClaw 主 Agent 尚未配置模型鉴权：${MAIN_AGENT_AUTH_PROFILES_PATH} 不存在。即使安装成功，AI 回复仍可能失败。`
+    );
   }
 
   results.gatewayReachable = await checkGateway();

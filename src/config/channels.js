@@ -8,6 +8,7 @@ const FEISHU_PHASES = [
   'restart_gateway',
   'events',
   'publish',
+  'post_publish_message',
 ];
 
 const FEISHU_PHASE_LABELS = {
@@ -20,6 +21,7 @@ const FEISHU_PHASE_LABELS = {
   restart_gateway: '重启 Gateway',
   events: '事件订阅',
   publish: '发布应用',
+  post_publish_message: '发送首条消息',
 };
 
 const WECOM_PHASES = [
@@ -50,8 +52,9 @@ const CHANNEL_SPECS = {
       'permissions',
       'events',
       'publish',
+      'post_publish_message',
     ],
-    completionMessage: '所有步骤已完成！飞书机器人已配置并连接到 OpenClaw。',
+    completionMessage: '所有步骤已完成！飞书机器人已配置、发布，并已主动给当前操作者发送首条消息。',
   },
   wecom: {
     id: 'wecom',

@@ -34,3 +34,13 @@ select:focus {
 button {
   transition: background-color 0.15s ease;
 }
+
+#advanced-panel summary::after {
+  content: '展开';
+  float: right;
+  color: #94a3b8;
+}
+
+#advanced-panel[open] summary::after {
+  content: '收起';
+}

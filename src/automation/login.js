@@ -21,11 +21,12 @@ async function waitForLogin(page, bus, options = {}) {
   bus.sendLog(`当前 URL: ${initialUrl}`);
 
   if (S.login.loggedInUrlPattern.test(initialUrl)) {
+    const loginContext = await fetchLoginContext(page, bus);
     if (reportPhase) {
       bus.sendPhase('login', 'done', '登录有效');
     }
     bus.sendLog('已确认飞书登录状态有效');
-    return;
+    return loginContext;
   }
 
   const credentialAttempted = await tryCredentialLogin(page, bus);
@@ -53,17 +54,48 @@ async function waitForLogin(page, bus, options = {}) {
       await page.waitForTimeout(3000);
       const currentUrl = page.url();
       if (S.login.loggedInUrlPattern.test(currentUrl)) {
-        if (reportPhase) {
+      if (reportPhase) {
           bus.sendPhase('login', 'done', '登录成功');
         }
         bus.sendLog('已检测到飞书登录成功');
-        return;
+        return fetchLoginContext(page, bus);
       }
     }
     await page.waitForTimeout(pollInterval);
   }
 
   throw new Error('登录超时（5分钟），请重试');
+}
+
+async function fetchLoginContext(page, bus) {
+  try {
+    const result = await page.evaluate(async () => {
+      const response = await fetch('https://open.feishu.cn/napi/check/login', {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+        },
+      });
+
+      return response.json();
+    });
+
+    if (result && result.code === 0 && result.data) {
+      if (bus) {
+        bus.sendLog(`已识别当前飞书操作者 userId=${result.data.id}`);
+      }
+      return {
+        userId: result.data.id || '',
+        tenantId: result.data.tenantId || '',
+      };
+    }
+  } catch (err) {
+    if (bus) {
+      bus.sendLog(`读取当前飞书登录上下文失败: ${err.message}`);
+    }
+  }
+
+  return null;
 }
 
 async function tryCredentialLogin(page, bus) {
@@ -161,4 +193,7 @@ async function clickFirstVisible(page, labels) {
   return false;
 }
 
-module.exports = { waitForLogin };
+module.exports = {
+  fetchLoginContext,
+  waitForLogin,
+};

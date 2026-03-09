@@ -8,6 +8,7 @@ const { enableBot } = require('./bot');
 const { configurePermissions } = require('./permissions');
 const { configureEvents } = require('./events-subscription');
 const { publishApp } = require('./publish');
+const { sendPostPublishMessage } = require('./post-publish-message');
 const { createWecomBot, waitForWecomLogin } = require('./wecom');
 const openclawConfig = require('../config/openclaw');
 const gatewayConfig = require('../config/gateway');
@@ -48,6 +49,12 @@ function createInitialState(channel = DEFAULT_CHANNEL) {
     appSecret: null,
     feishuAppUrl: null,
     publishStatus: null,
+    operatorUserId: '',
+    operatorTenantId: '',
+    postPublishMessageRoute: null,
+    postPublishMessageReceiveId: null,
+    postPublishMessageReceiveIdType: null,
+    postPublishMessageId: null,
     appName: '',
     botName: '',
     appDescription: '',
@@ -277,6 +284,10 @@ class Runner {
       this.state.websocketUrl = this.options.websocketUrl;
     }
 
+    if (!this.state.botName && this.state.appName) {
+      this.state.botName = this.state.appName;
+    }
+
     this.state.skipPairingApproval = this.options.skipPairingApproval;
   }
 
@@ -303,17 +314,38 @@ class Runner {
       this.state.appSecret = null;
       this.state.feishuAppUrl = null;
       this.state.publishStatus = null;
+      this.state.postPublishMessageRoute = null;
+      this.state.postPublishMessageReceiveId = null;
+      this.state.postPublishMessageReceiveIdType = null;
+      this.state.postPublishMessageId = null;
       return;
     }
 
     if (phaseIndex <= this.phaseIndex.credentials) {
       this.state.appSecret = null;
       this.state.publishStatus = null;
+      this.state.postPublishMessageRoute = null;
+      this.state.postPublishMessageReceiveId = null;
+      this.state.postPublishMessageReceiveIdType = null;
+      this.state.postPublishMessageId = null;
       return;
     }
 
     if (phaseIndex <= this.phaseIndex.publish) {
       this.state.publishStatus = null;
+      this.state.postPublishMessageRoute = null;
+      this.state.postPublishMessageReceiveId = null;
+      this.state.postPublishMessageReceiveIdType = null;
+      this.state.postPublishMessageId = null;
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(this.phaseIndex, 'post_publish_message')
+      && phaseIndex <= this.phaseIndex.post_publish_message) {
+      this.state.postPublishMessageRoute = null;
+      this.state.postPublishMessageReceiveId = null;
+      this.state.postPublishMessageReceiveIdType = null;
+      this.state.postPublishMessageId = null;
     }
   }
 
@@ -400,6 +432,15 @@ class Runner {
       }
       if (!this.state.appSecret && !producesAppSecret) {
         phaseErrors.push('执行 configure_openclaw 阶段前需要已有 appSecret，或从 credentials 阶段开始');
+      }
+    }
+
+    if (this.phaseSelected('post_publish_message')) {
+      if (!this.state.appId && !producesAppId) {
+        phaseErrors.push('执行 post_publish_message 阶段前需要已有 appId，或从 create_app 阶段开始');
+      }
+      if (!this.state.appSecret && !producesAppSecret) {
+        phaseErrors.push('执行 post_publish_message 阶段前需要已有 appSecret，或从 credentials 阶段开始');
       }
     }
 
@@ -508,7 +549,10 @@ class Runner {
     if (this.channel === 'wecom') {
       await waitForWecomLogin(this.page, this.bus, { reportPhase });
     } else {
-      await waitForFeishuLogin(this.page, this.bus, { reportPhase });
+      const loginContext = await waitForFeishuLogin(this.page, this.bus, { reportPhase });
+      this.state.operatorUserId = loginContext?.userId || '';
+      this.state.operatorTenantId = loginContext?.tenantId || '';
+      this.saveState();
     }
 
     if (reportPhase && !this.isPhaseCompleted('login')) {
@@ -700,6 +744,23 @@ class Runner {
       const status = await publishApp(this.page, this.bus, this.state.appId);
       this.state.publishStatus = status;
     }, '应用已发布');
+
+    await this.runSelectedPhase('post_publish_message', async () => {
+      const result = await sendPostPublishMessage(this.page, this.bus, {
+        appId: this.state.appId,
+        appSecret: this.state.appSecret,
+        appName: this.state.appName,
+        botName: this.state.botName,
+        skipPairingApproval: this.state.skipPairingApproval,
+        operatorUserId: this.state.operatorUserId,
+        operatorTenantId: this.state.operatorTenantId,
+      });
+      this.state.postPublishMessageRoute = result.route || null;
+      this.state.postPublishMessageReceiveId = result.receiveId || null;
+      this.state.postPublishMessageReceiveIdType = result.receiveIdType || null;
+      this.state.postPublishMessageId = result.messageId || null;
+      this.bus.sendPhase('post_publish_message', 'done', '首条消息已发送');
+    }, this.state.postPublishMessageId ? '首条消息已发送' : '首条消息已发送');
   }
 
   async runWecomPhases() {

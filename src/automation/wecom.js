@@ -242,7 +242,41 @@ async function configureVisibleScope(page, bus) {
   bus.sendLog(`可见范围已设置: ${selectedText}`);
 }
 
-async function saveBot(page, bus) {
+async function reopenBotDetailFromList(page, bus, botName) {
+  const targetName = String(botName || '').trim();
+  if (!targetName) {
+    return false;
+  }
+
+  bus.sendLog('保存后未自动跳转，尝试从机器人列表重新打开详情页...');
+  await safeGoto(page, ROBOT_LIST_URL, bus);
+
+  const candidates = page.getByText(targetName, { exact: true });
+  const start = Date.now();
+  while (Date.now() - start < 60000) {
+    const count = await candidates.count().catch(() => 0);
+    for (let i = 0; i < count; i += 1) {
+      const item = candidates.nth(i);
+      const visible = await item.isVisible().catch(() => false);
+      if (!visible) {
+        continue;
+      }
+
+      await item.click().catch(() => {});
+      await page.waitForTimeout(1500);
+      if (DETAIL_URL_PATTERN.test(page.url())) {
+        bus.sendLog('已从机器人列表重新进入详情页');
+        return true;
+      }
+    }
+
+    await page.waitForTimeout(1000);
+  }
+
+  return false;
+}
+
+async function saveBot(page, bus, options = {}) {
   const saveButton = page.getByRole('button', { name: '保存', exact: true }).last();
   await saveButton.scrollIntoViewIfNeeded().catch(() => {});
   await saveButton.click();
@@ -263,11 +297,21 @@ async function saveBot(page, bus) {
   }
 
   const start = Date.now();
+  let redirected = false;
   while (!DETAIL_URL_PATTERN.test(page.url())) {
     if (Date.now() - start > 60000) {
-      throw new Error('企业微信机器人保存后未进入详情页');
+      break;
     }
     await page.waitForTimeout(1000);
+  }
+
+  redirected = DETAIL_URL_PATTERN.test(page.url());
+  if (!redirected) {
+    redirected = await reopenBotDetailFromList(page, bus, options.botName);
+  }
+
+  if (!redirected) {
+    throw new Error('企业微信机器人保存后未进入详情页');
   }
 
   bus.sendLog('企业微信机器人已保存，进入详情页');
@@ -279,7 +323,7 @@ async function createWecomBot(page, bus, options = {}) {
   await editRobotInfo(page, bus, options);
   await revealCredentials(page, bus);
   await configureVisibleScope(page, bus);
-  await saveBot(page, bus);
+  await saveBot(page, bus, options);
 
   const credentials = await revealCredentials(page, bus);
   return {

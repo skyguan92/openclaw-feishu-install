@@ -35,6 +35,14 @@ The installer runs through 9 phases automatically:
 
 If anything fails mid-way, you can resume from where you left off, rerun from any specific phase, or stop at a chosen phase for modular use.
 
+Notable defaults in the Feishu flow:
+
+- `configure_openclaw` now auto-enables the Feishu plugin and backfills `@larksuiteoapi/node-sdk`. It prefers installing into `extensions/feishu/` and falls back to an isolated temp install + copy if the global OpenClaw package tree is hostile to `npm install`.
+- The default is still Feishu `pairing`, so the first private message requires `openclaw pairing approve`.
+- The UI keeps an explicit "skip first DM pairing" quick mode for personal-only bots. If enabled, it writes `channels.feishu.dmPolicy="open"` plus `allowFrom=["*"]`, so users inside the app's Feishu availability scope can talk to the bot immediately.
+- Do not enable that quick mode for shared or enterprise-wide bots unless you deliberately accept the exposure.
+- Feishu "available range" is still not automated. After publish, if other members cannot find the bot, add people or departments in "Version Management & Release -> Available Range" and publish again.
+
 ### Prerequisites
 
 - **OpenClaw** already installed and running (`openclaw` CLI must be on your `PATH`)
@@ -152,6 +160,14 @@ Apache-2.0
 9. **发布应用** — 提交应用发布到企业内部
 
 中途失败可以从断点恢复，也可以指定从某个阶段重新开始，或者只执行到某个阶段后暂停，方便模块化使用。
+
+飞书路径的当前默认行为：
+
+- `configure_openclaw` 现在会自动启用飞书插件并补装 `@larksuiteoapi/node-sdk`。它优先在 `extensions/feishu/` 下安装；如果 OpenClaw 全局包目录的 `npm install` 环境很脏，会自动退回到“临时目录隔离安装后复制依赖”的方式。
+- 默认仍保留飞书 `pairing`，因此第一次私聊仍需要执行 `openclaw pairing approve`。
+- Web UI 保留了显式“跳过首次私聊配对”快速模式；仅当你明确在做个人自用机器人时再勾选。勾选后会写入 `channels.feishu.dmPolicy="open"` 和 `allowFrom=["*"]`，让应用可用范围内的用户第一次私聊就能直接使用。
+- 如果你在接入共享机器人或企业内多人可见机器人，不要开启这个快速模式。
+- 飞书“可用范围”仍然不能自动化。发布后如果其他成员搜不到机器人，需要到“版本管理与发布 -> 可用范围”里手动加人或部门，再重新发布一次。
 
 ### 前置要求
 

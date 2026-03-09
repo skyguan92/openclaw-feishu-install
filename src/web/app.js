@@ -158,6 +158,9 @@ function applyStateToForm(state) {
   if (state.appDescription) {
     document.getElementById('app-desc').value = state.appDescription;
   }
+  if (state.skipPairingApproval !== undefined) {
+    document.getElementById('skip-pairing-approval').checked = Boolean(state.skipPairingApproval);
+  }
   if (state.appId) {
     document.getElementById('existing-app-id').value = state.appId;
   }
@@ -274,6 +277,7 @@ function collectPayload() {
     botId: document.getElementById('wecom-bot-id').value.trim(),
     botSecret: document.getElementById('wecom-bot-secret').value.trim(),
     websocketUrl: document.getElementById('wecom-websocket-url').value.trim(),
+    skipPairingApproval: document.getElementById('skip-pairing-approval').checked,
     startPhase: document.getElementById('start-phase').value,
     endPhase: document.getElementById('end-phase').value,
     clearLogin: document.getElementById('clear-login').checked,

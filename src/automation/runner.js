@@ -51,6 +51,7 @@ function createInitialState(channel = DEFAULT_CHANNEL) {
     appName: '',
     botName: '',
     appDescription: '',
+    skipPairingApproval: false,
     botId: '',
     botSecret: '',
     websocketUrl: '',
@@ -158,6 +159,7 @@ class Runner {
       botId: trimValue(options.botId),
       botSecret: trimValue(options.botSecret),
       websocketUrl: trimValue(options.websocketUrl),
+      skipPairingApproval: options.skipPairingApproval === true,
       startPhase: trimValue(options.startPhase),
       endPhase: trimValue(options.endPhase),
       clearLogin: Boolean(options.clearLogin),
@@ -231,6 +233,7 @@ class Runner {
       startPhase: this.startPhase,
       endPhase: this.endPhase,
       clearLogin: this.options.clearLogin,
+      skipPairingApproval: this.options.skipPairingApproval,
       updatedAt: new Date().toISOString(),
     };
     this.state.lastError = null;
@@ -273,6 +276,8 @@ class Runner {
     if (this.options.websocketUrl) {
       this.state.websocketUrl = this.options.websocketUrl;
     }
+
+    this.state.skipPairingApproval = this.options.skipPairingApproval;
   }
 
   invalidateStateFromPhase(phase) {
@@ -673,7 +678,10 @@ class Runner {
         this.bus,
         this.state.appId,
         this.state.appSecret,
-        { botName: this.state.botName }
+        {
+          botName: this.state.botName,
+          skipPairingApproval: this.state.skipPairingApproval,
+        }
       );
       this.bus.sendPhase('configure_openclaw', 'done', 'OpenClaw 配置完成');
     }, 'OpenClaw 已配置');

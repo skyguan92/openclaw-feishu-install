@@ -61,18 +61,32 @@ async function createApp(page, bus, { appName, appDescription }) {
 
   // Wait for navigation to app detail page
   bus.sendLog('等待应用创建完成...');
-  await page.waitForURL(/\/app\/cli_[a-zA-Z0-9]+/, { timeout: 30000 });
-
-  const url = page.url();
-  const match = url.match(S.createApp.appIdFromUrl);
-  if (!match) {
-    throw new Error('无法从 URL 中提取 App ID');
-  }
-
-  const appId = match[1];
+  const appId = await waitForCreatedAppId(page, bus);
   bus.sendPhase('create_app', 'done', `应用创建成功: ${appId}`);
   bus.sendLog(`App ID: ${appId}`);
   return appId;
+}
+
+async function waitForCreatedAppId(page, bus, timeoutMs = 60000) {
+  try {
+    await page.waitForURL(/\/app\/cli_[a-zA-Z0-9]+/, {
+      timeout: 30000,
+      waitUntil: 'commit',
+    });
+  } catch (err) {
+    bus.sendLog(`等待跳转超时，改为轮询当前 URL 提取 App ID: ${err.message}`);
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const match = page.url().match(S.createApp.appIdFromUrl);
+    if (match) {
+      return match[1];
+    }
+    await page.waitForTimeout(1000);
+  }
+
+  throw new Error('创建应用后长时间未进入详情页，无法提取 App ID');
 }
 
 function normalizeText(value, maxLength) {

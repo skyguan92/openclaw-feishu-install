@@ -25,6 +25,7 @@ async function publishApp(page, bus, appId) {
 
   if (await isPublished(page)) {
     bus.sendLog('已有已发布版本');
+    bus.sendLog('提醒：如果其他成员在飞书里搜不到机器人，还需要去“版本管理与发布 → 可用范围”里手动加人或部门并重新发布。');
     bus.sendPhase('publish', 'done', '已有发布版本，跳过');
     return 'already_published';
   }
@@ -39,6 +40,7 @@ async function publishApp(page, bus, appId) {
     throw new Error('版本提交后未进入已发布状态');
   }
 
+  bus.sendLog('提醒：发布完成后若其他成员搜不到机器人，还需要到“版本管理与发布 → 可用范围”手动添加人员或部门并重新发布。');
   bus.sendPhase('publish', 'done', `应用已发布上线（版本 ${versionNumber}）`);
   return 'published';
 }

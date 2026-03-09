@@ -49,6 +49,17 @@
             <input type="text" id="app-desc" placeholder="Powered by OpenClaw"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
           </div>
+          <div class="rounded-lg border border-amber-900/60 bg-amber-950/30 p-4">
+            <label class="flex items-start gap-3 text-sm text-amber-100">
+              <input type="checkbox" id="skip-pairing-approval" class="mt-1 rounded border-amber-800 bg-gray-900 text-amber-500 focus:ring-amber-500">
+              <span>
+                <span class="font-medium text-amber-200">快速模式：跳过首次私聊配对（仅个人自用）</span>
+                <span class="block mt-1 text-xs text-amber-100/80">
+                  勾选后会写入 `channels.feishu.dmPolicy=open` 和 `allowFrom=["*"]`，可用范围内的用户第一次私聊机器人就能直接使用。企业共享机器人默认不要开启。
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div>

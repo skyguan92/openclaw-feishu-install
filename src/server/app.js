@@ -71,6 +71,9 @@ function createApp() {
         botId: trimValue(req.body.botId) || trimValue(savedState.botId),
         botSecret: trimValue(req.body.botSecret) || trimValue(savedState.botSecret),
         websocketUrl: trimValue(req.body.websocketUrl) || trimValue(savedState.websocketUrl),
+        skipPairingApproval: req.body.skipPairingApproval !== undefined
+          ? Boolean(req.body.skipPairingApproval)
+          : Boolean(savedState.skipPairingApproval),
         startPhase: trimValue(req.body.startPhase),
         endPhase: trimValue(req.body.endPhase),
         clearLogin: Boolean(req.body.clearLogin),

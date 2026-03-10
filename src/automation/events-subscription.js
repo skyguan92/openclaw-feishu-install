@@ -146,10 +146,22 @@ async function addTargetEvent(page, bus, targetEvent) {
   });
   await page.waitForTimeout(800);
 
-  const confirmBtn = page.getByRole('button', { name: '确认添加', exact: true });
-  await confirmBtn.waitFor({ timeout: 10000 });
+  // 飞书 UI 曾用”确认添加”，后改为”添加”，按优先级依次尝试
+  let confirmBtn = null;
+  for (const label of ['添加', '确认添加']) {
+    const btn = page.getByRole('button', { name: label, exact: true });
+    if (await btn.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false)) {
+      confirmBtn = btn;
+      bus.sendLog(`找到确认按钮: “${label}”`);
+      break;
+    }
+  }
+  if (!confirmBtn) {
+    await safeScreenshot(page, 'error-events-confirm-btn.png');
+    throw new Error('添加事件确认按钮未找到（尝试了”添加”和”确认添加”）');
+  }
   if (await confirmBtn.isDisabled()) {
-    throw new Error(`事件 ${targetEvent} 已勾选，但“确认添加”按钮仍不可用`);
+    throw new Error(`事件 ${targetEvent} 已勾选，但确认按钮仍不可用`);
   }
 
   await confirmBtn.click();

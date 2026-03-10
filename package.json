@@ -7,7 +7,8 @@
   },
   "scripts": {
     "start": "node bin/cli.js",
-    "install-browser": "npx playwright install chromium"
+    "install-browser": "npx playwright install chromium",
+    "test:publish": "node test/run-feishu-publish.js"
   },
   "dependencies": {
     "express": "^4.18.2",

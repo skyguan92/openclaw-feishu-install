@@ -2,6 +2,7 @@ const { runOpenClaw, runOpenClawJson } = require('./openclaw-cli');
 
 const ARRAY_KEYS = ['requests', 'pendingRequests', 'pending', 'items', 'entries'];
 const PENDING_STATUSES = new Set(['', 'pending', 'requested']);
+const SAFE_APPROVAL_TARGET_PATTERN = /^[\p{L}\p{N}_.\- @]+$/u;
 
 function normalizeString(value) {
   if (value == null) {
@@ -73,20 +74,12 @@ function matchesExpectedTester(request, options = {}) {
   const requestId = normalizeComparable(getRequestStableId(request));
   const requestName = normalizeComparable(getRequestDisplayName(request));
 
-  if (expectedTesterId && requestId) {
-    return expectedTesterId === requestId;
+  if (expectedTesterId) {
+    return Boolean(requestId) && expectedTesterId === requestId;
   }
 
-  if (expectedTesterName && requestName) {
-    return expectedTesterName === requestName;
-  }
-
-  if (expectedTesterId && !requestId) {
-    return false;
-  }
-
-  if (expectedTesterName && !requestName) {
-    return false;
+  if (expectedTesterName) {
+    return Boolean(requestName) && expectedTesterName === requestName;
   }
 
   return false;
@@ -122,10 +115,24 @@ function listPairings() {
   return normalizePairingRequests(runOpenClawJson(['pairing', 'list'], { timeout: 15000 }));
 }
 
+function normalizeApprovalTarget(approvalTarget) {
+  const normalized = normalizeString(approvalTarget);
+  if (!normalized) {
+    throw new Error('pairing approve 参数不能为空');
+  }
+
+  if (!SAFE_APPROVAL_TARGET_PATTERN.test(normalized)) {
+    throw new Error('pairing approve 参数包含不安全字符，请改用稳定 ID/配对码或手动批准');
+  }
+
+  return normalized;
+}
+
 function approvePairing(channel, approvalTarget) {
+  const normalizedApprovalTarget = normalizeApprovalTarget(approvalTarget);
   const attempts = [
-    ['pairing', 'approve', channel, approvalTarget],
-    ['pairing', 'approve', approvalTarget],
+    ['pairing', 'approve', channel, normalizedApprovalTarget],
+    ['pairing', 'approve', normalizedApprovalTarget],
   ];
 
   let lastError = null;

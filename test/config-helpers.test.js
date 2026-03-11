@@ -2,11 +2,31 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { mergeConfigObjects } = require('../src/config/openclaw-cli');
+const pairingModule = require('../src/config/pairing');
 const {
   findMatchingPendingRequest,
   normalizePairingRequests,
   resolveApprovalTarget,
-} = require('../src/config/pairing');
+} = pairingModule;
+
+function loadPairingModule(overrides = {}) {
+  const pairingPath = require.resolve('../src/config/pairing');
+  const openclawCliPath = require.resolve('../src/config/openclaw-cli');
+  const originalOpenclawCliExports = require.cache[openclawCliPath].exports;
+
+  delete require.cache[pairingPath];
+  require.cache[openclawCliPath].exports = {
+    ...originalOpenclawCliExports,
+    ...overrides,
+  };
+
+  try {
+    return require(pairingPath);
+  } finally {
+    require.cache[openclawCliPath].exports = originalOpenclawCliExports;
+    delete require.cache[pairingPath];
+  }
+}
 
 test('mergeConfigObjects preserves unrelated config while merging nested channel settings', () => {
   const current = {
@@ -78,6 +98,21 @@ test('findMatchingPendingRequest selects the expected tester only', () => {
   assert.equal(request.userId, 'wxid-123');
 });
 
+test('findMatchingPendingRequest requires an ID match when expectedTesterId is provided', () => {
+  const request = findMatchingPendingRequest(
+    [
+      { channel: 'wecom', status: 'pending', sender: 'ChiRuoJing' },
+    ],
+    {
+      channel: 'wecom',
+      expectedTesterName: 'ChiRuoJing',
+      expectedTesterId: 'wxid-123',
+    }
+  );
+
+  assert.equal(request, null);
+});
+
 test('resolveApprovalTarget prefers sender for wecom and code for feishu', () => {
   assert.equal(
     resolveApprovalTarget('wecom', {
@@ -94,4 +129,20 @@ test('resolveApprovalTarget prefers sender for wecom and code for feishu', () =>
     }),
     'PAIR456'
   );
+});
+
+test('approvePairing rejects approval targets with shell metacharacters', () => {
+  let invoked = false;
+  const { approvePairing: approvePairingWithStub } = loadPairingModule({
+    runOpenClaw() {
+      invoked = true;
+      return 'ok';
+    },
+  });
+
+  assert.throws(
+    () => approvePairingWithStub('wecom', 'foo & calc.exe'),
+    /approve 参数包含不安全字符/
+  );
+  assert.equal(invoked, false);
 });

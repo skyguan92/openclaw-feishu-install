@@ -823,36 +823,32 @@ class Runner {
       await gatewayConfig.waitForWecomChannelConnected(this.bus, {
         since: verifyStartedAt,
       });
-      this.state.pairingApproval = {
-        status: 'gateway_ready',
+      const pairingMeta = {
         expectedTesterName: this.state.expectedTesterName,
         expectedTesterId: this.state.expectedTesterId,
-        observedAt: new Date().toISOString(),
       };
-      this.saveState();
-      if (this.state.expectedTesterName || this.state.expectedTesterId) {
+      const updatePairingApproval = (nextState) => {
+        this.state.pairingApproval = {
+          ...nextState,
+          ...pairingMeta,
+          observedAt: new Date().toISOString(),
+        };
+        this.saveState();
+      };
+
+      updatePairingApproval({ status: 'gateway_ready' });
+      if (pairingMeta.expectedTesterName || pairingMeta.expectedTesterId) {
         try {
           const pairingResult = await gatewayConfig.watchAndApproveWecomPairing(this.bus, {
-            expectedTesterName: this.state.expectedTesterName,
-            expectedTesterId: this.state.expectedTesterId,
+            ...pairingMeta,
             timeoutMs: this.state.pairingApprovalWindowMs,
           });
-          this.state.pairingApproval = {
-            ...pairingResult,
-            expectedTesterName: this.state.expectedTesterName,
-            expectedTesterId: this.state.expectedTesterId,
-            observedAt: new Date().toISOString(),
-          };
-          this.saveState();
+          updatePairingApproval(pairingResult);
         } catch (err) {
-          this.state.pairingApproval = {
+          updatePairingApproval({
             status: 'error',
             message: err.message,
-            expectedTesterName: this.state.expectedTesterName,
-            expectedTesterId: this.state.expectedTesterId,
-            observedAt: new Date().toISOString(),
-          };
-          this.saveState();
+          });
           this.bus.sendLog(`pairing watcher 失败，已跳过自动批准: ${err.message}`);
         }
       }

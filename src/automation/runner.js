@@ -63,6 +63,10 @@ function createInitialState(channel = DEFAULT_CHANNEL) {
     botSecret: '',
     websocketUrl: '',
     wecomBotUrl: null,
+    expectedTesterName: '',
+    expectedTesterId: '',
+    pairingApprovalWindowMs: 90000,
+    pairingApproval: null,
     lastError: null,
     lastRun: null,
   };
@@ -86,6 +90,11 @@ function trimValue(value) {
   }
 
   return String(value).trim();
+}
+
+function parsePositiveInteger(value, fallback = null) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function getFirstIncompletePhase(phases, completedPhases) {
@@ -167,6 +176,9 @@ class Runner {
       botSecret: trimValue(options.botSecret),
       websocketUrl: trimValue(options.websocketUrl),
       skipPairingApproval: options.skipPairingApproval === true,
+      expectedTesterName: trimValue(options.expectedTesterName),
+      expectedTesterId: trimValue(options.expectedTesterId),
+      pairingApprovalWindowMs: parsePositiveInteger(options.pairingApprovalWindowMs, null),
       startPhase: trimValue(options.startPhase),
       endPhase: trimValue(options.endPhase),
       clearLogin: Boolean(options.clearLogin),
@@ -289,6 +301,12 @@ class Runner {
     }
 
     this.state.skipPairingApproval = this.options.skipPairingApproval;
+    this.state.expectedTesterName = this.options.expectedTesterName;
+    this.state.expectedTesterId = this.options.expectedTesterId;
+
+    if (this.options.pairingApprovalWindowMs) {
+      this.state.pairingApprovalWindowMs = this.options.pairingApprovalWindowMs;
+    }
   }
 
   invalidateStateFromPhase(phase) {
@@ -805,6 +823,39 @@ class Runner {
       await gatewayConfig.waitForWecomChannelConnected(this.bus, {
         since: verifyStartedAt,
       });
+      this.state.pairingApproval = {
+        status: 'gateway_ready',
+        expectedTesterName: this.state.expectedTesterName,
+        expectedTesterId: this.state.expectedTesterId,
+        observedAt: new Date().toISOString(),
+      };
+      this.saveState();
+      if (this.state.expectedTesterName || this.state.expectedTesterId) {
+        try {
+          const pairingResult = await gatewayConfig.watchAndApproveWecomPairing(this.bus, {
+            expectedTesterName: this.state.expectedTesterName,
+            expectedTesterId: this.state.expectedTesterId,
+            timeoutMs: this.state.pairingApprovalWindowMs,
+          });
+          this.state.pairingApproval = {
+            ...pairingResult,
+            expectedTesterName: this.state.expectedTesterName,
+            expectedTesterId: this.state.expectedTesterId,
+            observedAt: new Date().toISOString(),
+          };
+          this.saveState();
+        } catch (err) {
+          this.state.pairingApproval = {
+            status: 'error',
+            message: err.message,
+            expectedTesterName: this.state.expectedTesterName,
+            expectedTesterId: this.state.expectedTesterId,
+            observedAt: new Date().toISOString(),
+          };
+          this.saveState();
+          this.bus.sendLog(`pairing watcher 失败，已跳过自动批准: ${err.message}`);
+        }
+      }
       this.bus.sendPhase('restart_gateway', 'done', 'Gateway 重启成功');
     }, 'Gateway 已就绪');
   }

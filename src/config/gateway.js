@@ -8,6 +8,7 @@ const {
   runOpenClawJson,
   setConfigValue,
 } = require('./openclaw-cli');
+const pairingModule = require('./pairing');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const net = require('net');
@@ -317,6 +318,13 @@ async function waitForWecomChannelConnected(bus, options = {}) {
   throw new Error('未在 Gateway 日志中检测到企业微信长连接建立成功');
 }
 
+async function watchAndApproveWecomPairing(bus, options = {}) {
+  return pairingModule.waitForExpectedPairingAndApprove(bus, {
+    ...options,
+    channel: 'wecom',
+  });
+}
+
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -543,5 +551,6 @@ module.exports = {
   restartGateway,
   getGatewayStatus,
   isGatewayReady,
+  watchAndApproveWecomPairing,
   waitForWecomChannelConnected,
 };

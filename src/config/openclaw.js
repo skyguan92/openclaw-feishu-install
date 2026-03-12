@@ -4,6 +4,7 @@ const { execFileSync, spawnSync } = require('child_process');
 const path = require('path');
 const { CONFIG_PATH } = require('../utils/paths');
 const {
+  applyConfigPatch,
   getOpenClawLookupHint,
   openclawExists,
   repairLegacyConfig,
@@ -68,33 +69,46 @@ async function configureFeishuOpenClaw(bus, appId, appSecret, options = {}) {
   ensureFeishuSdk(bus);
   ensurePluginAllowList(bus, ['feishu']);
 
-  setConfigValue('gateway.mode', 'local');
-  setConfigValue('channels.feishu.enabled', true);
-  setConfigValue('channels.feishu.connectionMode', 'websocket');
-  setConfigValue('channels.feishu.streaming', false);
-  setConfigValue('channels.feishu.defaultAccount', FEISHU_ACCOUNT_ID);
-  setConfigValue(`channels.feishu.accounts.${FEISHU_ACCOUNT_ID}.appId`, appId);
-  setConfigValue(`channels.feishu.accounts.${FEISHU_ACCOUNT_ID}.appSecret`, appSecret);
+  const accountPatch = {
+    appId,
+    appSecret,
+  };
   if (options.botName) {
-    setConfigValue(`channels.feishu.accounts.${FEISHU_ACCOUNT_ID}.botName`, options.botName);
+    accountPatch.botName = options.botName;
   }
+  const feishuPatch = {
+    enabled: true,
+    connectionMode: 'websocket',
+    streaming: false,
+    defaultAccount: FEISHU_ACCOUNT_ID,
+    dmPolicy: options.skipPairingApproval === true ? 'open' : 'pairing',
+    accounts: {
+      [FEISHU_ACCOUNT_ID]: accountPatch,
+    },
+  };
   if (options.skipPairingApproval === true) {
-    setConfigValue('channels.feishu.dmPolicy', 'open');
-    setConfigValue('channels.feishu.allowFrom', ['*']);
+    feishuPatch.allowFrom = ['*'];
+  }
+  applyConfigPatch({
+    gateway: { mode: 'local' },
+    channels: {
+      feishu: feishuPatch,
+    },
+  });
+
+  if (options.skipPairingApproval === true) {
     bus.sendLog('已启用快速私聊模式：channels.feishu.dmPolicy=open，allowFrom=["*"]（仅建议个人自用）');
   } else {
-    setConfigValue('channels.feishu.dmPolicy', 'pairing');
     try {
       runOpenClaw(['config', 'unset', 'channels.feishu.allowFrom'], { timeout: 60000 });
     } catch {
       // allow empty/unset configs
     }
+    runOpenClaw(['config', 'validate'], { timeout: 60000 });
     bus.sendLog('已启用默认私聊配对策略：首次私聊仍需 pairing approve');
   }
 
-  runOpenClaw(['config', 'validate'], { timeout: 60000 });
-
-  bus.sendLog('已写入 channels.feishu.* 配置，默认关闭 streaming card，并设置 gateway.mode=local');
+  bus.sendLog('已原子写入 channels.feishu.* 配置，默认关闭 streaming card，并设置 gateway.mode=local');
 }
 
 async function configureWecomOpenClaw(bus, botId, botSecret, options = {}) {
@@ -112,20 +126,25 @@ async function configureWecomOpenClaw(bus, botId, botSecret, options = {}) {
   ensureWecomPlugin(bus);
   ensurePluginAllowList(bus, [WECOM_PLUGIN_ID]);
 
-  setConfigValue('gateway.mode', 'local');
-  setConfigValue('channels.wecom.enabled', true);
-  setConfigValue('channels.wecom.botId', botId);
-  setConfigValue('channels.wecom.secret', botSecret);
+  const wecomPatch = {
+    enabled: true,
+    botId,
+    secret: botSecret,
+  };
   if (options.botName) {
-    setConfigValue('channels.wecom.name', options.botName);
+    wecomPatch.name = options.botName;
   }
   if (options.websocketUrl) {
-    setConfigValue('channels.wecom.websocketUrl', options.websocketUrl);
+    wecomPatch.websocketUrl = options.websocketUrl;
   }
+  applyConfigPatch({
+    gateway: { mode: 'local' },
+    channels: {
+      wecom: wecomPatch,
+    },
+  });
 
-  runOpenClaw(['config', 'validate'], { timeout: 60000 });
-
-  bus.sendLog('已写入 channels.wecom.* 配置，使用企业微信智能机器人长连接模式');
+  bus.sendLog('已原子写入 channels.wecom.* 配置，使用企业微信智能机器人长连接模式');
 }
 
 function ensureFeishuPlugin(bus) {

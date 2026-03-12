@@ -6,6 +6,7 @@ const {
   hasLegacyGatewaysKey,
   openclawExists,
   resolveOpenClawBinary,
+  resolveOpenClawPackageDir,
   runOpenClawJson,
 } = require('./openclaw-cli');
 const stateModule = require('./state');
@@ -18,15 +19,29 @@ async function runPreflight() {
     hasPendingState: false,
     pendingState: null,
     clawPath: null,
+    openclawPackageDir: null,
+    nodeVersion: process.versions.node,
+    nodeVersionSatisfied: false,
+    pluginPackages: {
+      feishu: { detected: false, packagePath: null },
+      wecom: { detected: false, packagePath: null },
+    },
     errors: [],
     warnings: [],
   };
+
+  results.nodeVersionSatisfied = getNodeMajorVersion(results.nodeVersion) >= 22;
+  if (!results.nodeVersionSatisfied) {
+    results.errors.push(`当前 Node.js 版本是 ${results.nodeVersion}，OpenClaw 建议使用 >= 22.x。`);
+  }
 
   results.clawInstalled = openclawExists();
   results.clawPath = resolveOpenClawBinary();
   if (!results.clawInstalled) {
     results.errors.push(getOpenClawLookupHint());
   }
+  results.openclawPackageDir = resolveOpenClawPackageDir();
+  results.pluginPackages = detectPluginPackages(results.openclawPackageDir);
 
   results.configExists = fs.existsSync(CONFIG_PATH);
 
@@ -51,6 +66,38 @@ async function runPreflight() {
   return results;
 }
 
+function getNodeMajorVersion(version) {
+  const parsed = parseInt(String(version || '').split('.')[0], 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function detectPluginPackages(packageDir) {
+  const plugins = {
+    feishu: { detected: false, packagePath: null },
+    wecom: { detected: false, packagePath: null },
+  };
+
+  if (!packageDir) {
+    return plugins;
+  }
+
+  const candidates = {
+    feishu: `${packageDir}/node_modules/@openclaw/feishu/package.json`,
+    wecom: `${packageDir}/node_modules/@wecom/wecom-openclaw-plugin/package.json`,
+  };
+
+  for (const [channel, pluginPath] of Object.entries(candidates)) {
+    if (fs.existsSync(pluginPath)) {
+      plugins[channel] = {
+        detected: true,
+        packagePath: pluginPath,
+      };
+    }
+  }
+
+  return plugins;
+}
+
 function checkGateway() {
   if (!openclawExists()) {
     return Promise.resolve(false);
@@ -64,4 +111,4 @@ function checkGateway() {
   }
 }
 
-module.exports = { runPreflight, checkGateway };
+module.exports = { runPreflight, checkGateway, detectPluginPackages, getNodeMajorVersion };

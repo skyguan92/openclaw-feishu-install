@@ -1,3 +1,8 @@
+const {
+  buildFeishuUrl,
+  getLoggedInUrlPattern,
+} = require('../config/feishu-domain');
+
 // Centralized selectors for Feishu Open Platform UI.
 // Based on real DOM exploration on 2026-03-07.
 //
@@ -8,11 +13,11 @@
 module.exports = {
   // URLs
   urls: {
-    appList: 'https://open.feishu.cn/app',
-    appBase: (appId) => `https://open.feishu.cn/app/${appId}`,
+    appList: buildFeishuUrl('/app'),
+    appBase: (appId) => buildFeishuUrl(`/app/${appId}`),
     // These work for initial navigation:
-    credentials: (appId) => `https://open.feishu.cn/app/${appId}/baseinfo`,
-    version: (appId) => `https://open.feishu.cn/app/${appId}/version`,
+    credentials: (appId) => buildFeishuUrl(`/app/${appId}/baseinfo`),
+    version: (appId) => buildFeishuUrl(`/app/${appId}/version`),
     // These DON'T work via URL (SPA routes, redirect to /baseinfo):
     // - /bot, /permission/scope/list, /event/config
     // Must use sidebar navigation instead.
@@ -32,7 +37,7 @@ module.exports = {
 
   // Login
   login: {
-    loggedInUrlPattern: /open\.feishu\.cn\/app\/?$/,
+    loggedInUrlPattern: getLoggedInUrlPattern(),
     accountHints: ['邮箱', '手机号', '手机号码', '账号', 'email', 'phone'],
     passwordHints: ['密码', 'password'],
     nextButtons: ['下一步', '继续', '登录'],

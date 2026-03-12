@@ -44,6 +44,7 @@ Notable defaults in the Feishu flow:
 - The UI keeps an explicit "skip first DM pairing" quick mode for personal-only bots. If enabled, it writes `channels.feishu.dmPolicy="open"` plus `allowFrom=["*"]`, so users inside the app's Feishu availability scope can talk to the bot immediately.
 - Do not enable that quick mode for shared or enterprise-wide bots unless you deliberately accept the exposure.
 - Feishu "available range" is still not automated. After publish, if other members cannot find the bot, add people or departments in "Version Management & Release -> Available Range" and publish again.
+- For recurring Lark integration failures and repair priorities, see [docs/lark-integration-issues.md](docs/lark-integration-issues.md).
 
 ### Prerequisites
 
@@ -173,6 +174,7 @@ Apache-2.0
 - Web UI 保留了显式“跳过首次私聊配对”快速模式；仅当你明确在做个人自用机器人时再勾选。勾选后会写入 `channels.feishu.dmPolicy="open"` 和 `allowFrom=["*"]`，让应用可用范围内的用户第一次私聊就能直接使用。
 - 如果你在接入共享机器人或企业内多人可见机器人，不要开启这个快速模式。
 - 飞书“可用范围”仍然不能自动化。发布后如果其他成员搜不到机器人，需要到“版本管理与发布 -> 可用范围”里手动加人或部门，再重新发布一次。
+- 如果要查看 Lark 对接的已知问题和修复优先级，见 [docs/lark-integration-issues.md](docs/lark-integration-issues.md)。
 
 ### 前置要求
 

@@ -1,6 +1,7 @@
 const { fetchLoginContext } = require('./login');
+const { buildFeishuUrl } = require('../config/feishu-domain');
 
-const FEISHU_OPEN_API_BASE = 'https://open.feishu.cn/open-apis';
+const FEISHU_OPEN_API_BASE = buildFeishuUrl('/open-apis');
 
 async function sendPostPublishMessage(page, bus, options) {
   bus.sendPhase('post_publish_message', 'running', '正在给当前用户发送首条消息...');
@@ -12,6 +13,7 @@ async function sendPostPublishMessage(page, bus, options) {
 
   const tenantAccessToken = await getTenantAccessToken(options.appId, options.appSecret);
   const messageText = buildWelcomeMessage(options);
+  const guidance = buildPostPublishGuidance(options);
   const attemptErrors = [];
 
   try {
@@ -19,13 +21,13 @@ async function sendPostPublishMessage(page, bus, options) {
     if (scopedTarget && scopedTarget.openId) {
       const result = await createTextMessage(tenantAccessToken, 'open_id', scopedTarget.openId, messageText);
       bus.sendLog(`已通过 contact/v3/scopes 定位到 open_id 并发送首条消息: ${scopedTarget.openId}`);
-      return {
+      return finalizePostPublishResult(bus, guidance, {
         route: 'scope_open_id',
         receiveId: scopedTarget.openId,
         receiveIdType: 'open_id',
         messageId: result.message_id || '',
         operatorUserId: operator.userId,
-      };
+      });
     }
 
     attemptErrors.push('contact/v3/scopes 未能唯一定位当前操作者');
@@ -37,18 +39,30 @@ async function sendPostPublishMessage(page, bus, options) {
   try {
     const result = await createTextMessage(tenantAccessToken, 'user_id', operator.userId, messageText);
     bus.sendLog(`已回退为 user_id 直发首条消息: ${operator.userId}`);
-    return {
+    return finalizePostPublishResult(bus, guidance, {
       route: 'user_id',
       receiveId: operator.userId,
       receiveIdType: 'user_id',
       messageId: result.message_id || '',
       operatorUserId: operator.userId,
-    };
+    });
   } catch (err) {
     attemptErrors.push(`user_id 直发失败: ${err.message}`);
   }
 
   throw new Error(`发送首条消息失败：${attemptErrors.join('；')}`);
+}
+
+function finalizePostPublishResult(bus, guidance, result) {
+  for (const line of guidance.followUpLogs) {
+    bus.sendLog(line);
+  }
+
+  return {
+    ...result,
+    pairingRequired: guidance.pairingRequired,
+    phaseDoneMessage: guidance.phaseDoneMessage,
+  };
 }
 
 async function resolveOperatorContext(page, bus, options) {
@@ -136,6 +150,40 @@ function extractScopeMembers(data) {
   const results = [];
   const seen = new Set();
 
+  function pushMember({ openId = '', userId = '', name = '' }) {
+    const normalizedOpenId = String(openId || '').trim();
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedOpenId && !normalizedUserId) {
+      return;
+    }
+
+    const key = `${normalizedOpenId}:${normalizedUserId}`;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    results.push({
+      openId: normalizedOpenId,
+      userId: normalizedUserId,
+      name: String(name || '').trim(),
+    });
+  }
+
+  function pushCandidateId(candidate, name = '') {
+    const normalized = String(candidate || '').trim();
+    if (!normalized) {
+      return;
+    }
+
+    if (normalized.startsWith('ou_')) {
+      pushMember({ openId: normalized, name });
+      return;
+    }
+
+    pushMember({ userId: normalized, name });
+  }
+
   function walk(node, depth = 0) {
     if (!node || depth > 6) {
       return;
@@ -156,15 +204,17 @@ function extractScopeMembers(data) {
     const userId = node.user_id || node.userId || node.employee_id || node.employeeId || '';
     const name = node.name || node.display_name || node.displayName || node.en_name || node.enName || '';
 
-    if (openId) {
-      const key = `${openId}:${userId}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        results.push({
-          openId,
-          userId,
-          name,
-        });
+    if (openId || userId) {
+      pushMember({ openId, userId, name });
+    }
+
+    for (const key of ['user_ids', 'userIds', 'open_ids', 'openIds']) {
+      if (!Array.isArray(node[key])) {
+        continue;
+      }
+
+      for (const candidate of node[key]) {
+        pushCandidateId(candidate, name);
       }
     }
 
@@ -199,6 +249,27 @@ function buildWelcomeMessage(options) {
   }
 
   return `${botName} 已安装完成。你已经收到机器人的首条私信，后续直接在这个会话里回复任意一句话，即可继续首次配对。`;
+}
+
+function buildPostPublishGuidance(options) {
+  if (options.skipPairingApproval) {
+    return {
+      pairingRequired: false,
+      phaseDoneMessage: '首条消息已发送，用户现在可以直接在这个会话里开始使用',
+      followUpLogs: [
+        '已启用跳过首次私聊配对；用户现在可以直接在这个会话里开始使用。',
+      ],
+    };
+  }
+
+  return {
+    pairingRequired: true,
+    phaseDoneMessage: '首条消息已发送；仍需用户回复一句话触发 pairing，再执行 approve',
+    followUpLogs: [
+      '首条私信已送达，但默认仍需完成首次 pairing，当前还不能直接视为“已可对话”。',
+      '请让用户先在这个会话里回复任意一句话，拿到 pairing code 后执行 `openclaw pairing approve feishu <code>`。',
+    ],
+  };
 }
 
 async function requestFeishuJson(path, options = {}) {

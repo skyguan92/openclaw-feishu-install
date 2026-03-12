@@ -1,4 +1,5 @@
 const S = require('./selectors');
+const { buildFeishuUrl } = require('../config/feishu-domain');
 
 async function waitForLogin(page, bus, options = {}) {
   const reportPhase = options.reportPhase !== false;
@@ -69,8 +70,9 @@ async function waitForLogin(page, bus, options = {}) {
 
 async function fetchLoginContext(page, bus) {
   try {
-    const result = await page.evaluate(async () => {
-      const response = await fetch('https://open.feishu.cn/napi/check/login', {
+    const loginCheckUrl = buildFeishuUrl('/napi/check/login');
+    const result = await page.evaluate(async (targetUrl) => {
+      const response = await fetch(targetUrl, {
         credentials: 'include',
         headers: {
           Accept: 'application/json, text/plain, */*',
@@ -78,7 +80,7 @@ async function fetchLoginContext(page, bus) {
       });
 
       return response.json();
-    });
+    }, loginCheckUrl);
 
     if (result && result.code === 0 && result.data) {
       if (bus) {

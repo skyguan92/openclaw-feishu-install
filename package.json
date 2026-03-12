@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node bin/cli.js",
+    "test": "node --test test/feishu-domain.test.js test/post-publish-message.test.js test/publish-outcome.test.js test/runner-completion.test.js",
     "install-browser": "npx playwright install chromium",
     "test:publish": "node test/run-feishu-publish.js"
   },

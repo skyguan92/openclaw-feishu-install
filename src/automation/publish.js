@@ -3,12 +3,18 @@ const { dismissModals } = require('./dismiss-modals');
 const fs = require('fs');
 const path = require('path');
 const { LOG_DIR } = require('../utils/paths');
+const {
+  buildFeishuUrl,
+  isFeishuDeveloperApiUrl,
+  simplifyFeishuUrl,
+} = require('../config/feishu-domain');
 
 const PUBLISH_COMMIT_RESPONSE_TIMEOUT_MS = 20000;
 const PUBLISH_RESULT_TIMEOUT_MS = 180000;
 const PUBLISH_POLL_INTERVAL_MS = 3000;
 const PUBLISH_REFRESH_INTERVAL_MS = 15000;
 const TRACE_EVENT_LIMIT = 20;
+const AVAILABLE_RANGE_MANUAL_ACTION_MESSAGE = '若需让其他成员在 Feishu / Lark 中搜到机器人，仍需到“版本管理与发布 → 可用范围”手动添加人员或部门并重新发布。';
 
 async function publishApp(page, bus, appId, options = {}) {
   const trace = observePublishResponses(page, bus);
@@ -40,10 +46,11 @@ async function publishApp(page, bus, appId, options = {}) {
     lastObservedState = await inspectPublishState(page, appId);
     bus.sendLog(`版本页状态: ${formatPublishStateSummary(lastObservedState)}`);
     if (lastObservedState.published && !forceNewVersion) {
+      const outcome = buildPublishOutcome('already_published');
       bus.sendLog('检测到当前修改均已发布，跳过创建新版本');
-      bus.sendLog('提醒：如果其他成员在飞书里搜不到机器人，还需要去“版本管理与发布 → 可用范围”里手动加人或部门并重新发布。');
-      bus.sendPhase('publish', 'done', '已有发布版本，跳过');
-      return 'already_published';
+      bus.sendLog(outcome.manualActionMessage);
+      bus.sendPhase('publish', 'done', outcome.phaseDoneMessage);
+      return outcome;
     }
 
     if (lastObservedState.published && forceNewVersion) {
@@ -78,15 +85,31 @@ async function publishApp(page, bus, appId, options = {}) {
       }
     }
 
-    bus.sendLog('提醒：发布完成后若其他成员搜不到机器人，还需要到“版本管理与发布 → 可用范围”手动添加人员或部门并重新发布。');
-    bus.sendPhase('publish', 'done', `应用已发布上线（版本 ${versionNumber}）`);
-    return 'published';
+    const outcome = buildPublishOutcome('published', { versionNumber });
+    bus.sendLog(outcome.manualActionMessage);
+    bus.sendPhase('publish', 'done', outcome.phaseDoneMessage);
+    return outcome;
   } catch (err) {
     await capturePublishDebug(page, bus, trace, lastObservedState);
     throw err;
   } finally {
     trace.dispose();
   }
+}
+
+function buildPublishOutcome(status, options = {}) {
+  const versionNumber = String(options.versionNumber || '').trim();
+  const primaryMessage = status === 'already_published'
+    ? '已有发布版本，跳过'
+    : `应用已发布上线（版本 ${versionNumber || 'unknown'}）`;
+
+  return {
+    status,
+    primaryMessage,
+    manualActionRequired: true,
+    manualActionMessage: AVAILABLE_RANGE_MANUAL_ACTION_MESSAGE,
+    phaseDoneMessage: `${primaryMessage}；${AVAILABLE_RANGE_MANUAL_ACTION_MESSAGE}`,
+  };
 }
 
 function observePublishResponses(page, bus) {
@@ -111,7 +134,7 @@ function observePublishResponses(page, bus) {
 
   const onResponse = async (response) => {
     const url = response.url();
-    if (!url.includes('open.feishu.cn/developers/v1/')) {
+    if (!isFeishuDeveloperApiUrl(url)) {
       return;
     }
 
@@ -475,7 +498,7 @@ async function isDraftVersionPage(page) {
 
 async function inspectPublishState(page, appId) {
   const [meta, versionList, bodyText, visibleButtons, validationHints] = await Promise.all([
-    appId ? fetchFeishuJson(page, `https://open.feishu.cn/developers/v1/app/${appId}`) : null,
+    appId ? fetchFeishuJson(page, buildFeishuUrl(`/developers/v1/app/${appId}`)) : null,
     appId ? fetchVersionList(page, appId) : null,
     page.textContent('body').catch(() => ''),
     getVisibleButtonLabels(page).catch(() => []),
@@ -555,8 +578,9 @@ async function fetchFeishuJson(page, url) {
 
 async function fetchVersionList(page, appId) {
   try {
+    const versionListUrl = buildFeishuUrl(`/developers/v1/app_version/list/${appId}`);
     const result = await page.evaluate(async (targetAppId) => {
-      const response = await fetch(`https://open.feishu.cn/developers/v1/app_version/list/${targetAppId}`, {
+      const response = await fetch(targetAppId, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -570,7 +594,7 @@ async function fetchVersionList(page, appId) {
         status: response.status,
         data: await response.json().catch(() => null),
       };
-    }, appId);
+    }, versionListUrl);
 
     return result.ok ? result.data : null;
   } catch {
@@ -794,10 +818,6 @@ function formatPublishStateSummary(state) {
   return `${flags.join('，') || '状态未明'}; ${metaText}; buttons=${buttonText}`;
 }
 
-function simplifyFeishuUrl(url) {
-  return url.replace(/^https:\/\/open\.feishu\.cn/, '');
-}
-
 function compactValue(value, limit = 400) {
   let text = '';
   try {
@@ -822,4 +842,4 @@ function buildVersionNumber() {
   return `1.0.${parts.join('')}`;
 }
 
-module.exports = { publishApp };
+module.exports = { buildPublishOutcome, publishApp };

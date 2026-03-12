@@ -19,6 +19,7 @@ const {
   SCREENSHOT_DIR,
 } = require('../utils/paths');
 const stateModule = require('../config/state');
+const { buildFeishuUrl } = require('../config/feishu-domain');
 const {
   DEFAULT_CHANNEL,
   getChannelSpec,
@@ -49,6 +50,9 @@ function createInitialState(channel = DEFAULT_CHANNEL) {
     appSecret: null,
     feishuAppUrl: null,
     publishStatus: null,
+    publishPrimaryMessage: '',
+    publishManualActionRequired: false,
+    publishManualActionMessage: '',
     operatorUserId: '',
     operatorTenantId: '',
     postPublishMessageRoute: null,
@@ -105,6 +109,15 @@ function getPhaseRange(phases, phaseIndex, startPhase, endPhase) {
 
 function defaultAppDescription(appName) {
   return appName ? `${appName} - powered by OpenClaw` : '';
+}
+
+function buildSuccessDoneMessage(channelSpec, state = {}) {
+  const baseMessage = channelSpec?.completionMessage || '所有步骤已完成。';
+  if (!state.publishManualActionRequired || !state.publishManualActionMessage) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} ${state.publishManualActionMessage}`;
 }
 
 function isProfileLockError(err) {
@@ -265,7 +278,7 @@ class Runner {
 
     if (this.options.appId) {
       this.state.appId = this.options.appId;
-      this.state.feishuAppUrl = `https://open.feishu.cn/app/${this.options.appId}`;
+      this.state.feishuAppUrl = buildFeishuUrl(`/app/${this.options.appId}`);
     }
 
     if (this.options.appSecret) {
@@ -611,7 +624,7 @@ class Runner {
       const finishedAllPhases = this.phases.every((phase) => this.state.completedPhases.includes(phase));
       if (finishedAllPhases && this.endPhase === this.phases[this.phases.length - 1]) {
         this.clearState();
-        this.bus.sendDone(true, this.channelSpec.completionMessage);
+        this.bus.sendDone(true, buildSuccessDoneMessage(this.channelSpec, this.state));
       } else {
         this.saveState();
         this.bus.sendDone(true, `已完成到步骤 "${this.endPhase}"，可按需继续执行后续阶段。`);
@@ -700,7 +713,7 @@ class Runner {
         appDescription: this.state.appDescription,
       });
       this.state.appId = appId;
-      this.state.feishuAppUrl = `https://open.feishu.cn/app/${appId}`;
+      this.state.feishuAppUrl = buildFeishuUrl(`/app/${appId}`);
     }, this.state.appId ? `应用已创建: ${this.state.appId}` : '应用已创建');
 
     await this.runSelectedPhase('credentials', async () => {
@@ -741,8 +754,11 @@ class Runner {
     }, '事件订阅已配置');
 
     await this.runSelectedPhase('publish', async () => {
-      const status = await publishApp(this.page, this.bus, this.state.appId);
-      this.state.publishStatus = status;
+      const result = await publishApp(this.page, this.bus, this.state.appId);
+      this.state.publishStatus = result?.status || null;
+      this.state.publishPrimaryMessage = result?.primaryMessage || '';
+      this.state.publishManualActionRequired = result?.manualActionRequired === true;
+      this.state.publishManualActionMessage = result?.manualActionMessage || '';
     }, '应用已发布');
 
     await this.runSelectedPhase('post_publish_message', async () => {
@@ -759,7 +775,7 @@ class Runner {
       this.state.postPublishMessageReceiveId = result.receiveId || null;
       this.state.postPublishMessageReceiveIdType = result.receiveIdType || null;
       this.state.postPublishMessageId = result.messageId || null;
-      this.bus.sendPhase('post_publish_message', 'done', '首条消息已发送');
+      this.bus.sendPhase('post_publish_message', 'done', result.phaseDoneMessage || '首条消息已发送');
     }, this.state.postPublishMessageId ? '首条消息已发送' : '首条消息已发送');
   }
 
@@ -810,4 +826,4 @@ class Runner {
   }
 }
 
-module.exports = { Runner };
+module.exports = { buildSuccessDoneMessage, Runner };

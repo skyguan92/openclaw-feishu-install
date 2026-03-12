@@ -238,6 +238,59 @@ function runOpenClawJson(args, options = {}) {
   return JSON.parse(output);
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeConfigObjects(currentValue, patchValue) {
+  if (Array.isArray(patchValue)) {
+    return patchValue.slice();
+  }
+
+  if (isPlainObject(patchValue)) {
+    const currentObject = isPlainObject(currentValue) ? currentValue : {};
+    const merged = { ...currentObject };
+    for (const [key, value] of Object.entries(patchValue)) {
+      merged[key] = mergeConfigObjects(currentObject[key], value);
+    }
+    return merged;
+  }
+
+  return patchValue;
+}
+
+function writeConfigJsonAtomic(config) {
+  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+  const tempPath = `${CONFIG_PATH}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tempPath, JSON.stringify(config, null, 2));
+  fs.renameSync(tempPath, CONFIG_PATH);
+}
+
+function applyConfigPatch(configPatch, options = {}) {
+  const configExists = fs.existsSync(CONFIG_PATH);
+  const previousConfig = readConfigJson();
+  const mergedConfig = mergeConfigObjects(previousConfig || {}, configPatch);
+
+  writeConfigJsonAtomic(mergedConfig);
+
+  if (options.validate === false) {
+    return mergedConfig;
+  }
+
+  try {
+    runOpenClaw(['config', 'validate'], { timeout: options.timeout || 60000 });
+  } catch (err) {
+    if (configExists && previousConfig) {
+      writeConfigJsonAtomic(previousConfig);
+    } else {
+      fs.rmSync(CONFIG_PATH, { force: true });
+    }
+    throw new Error(`配置写入后校验失败，已回滚: ${err.message}`);
+  }
+
+  return mergedConfig;
+}
+
 function setConfigValue(configPath, value) {
   return runOpenClaw(
     ['config', 'set', configPath, JSON.stringify(value), '--strict-json'],
@@ -295,5 +348,8 @@ module.exports = {
   resolveOpenClawPackageDir,
   runOpenClaw,
   runOpenClawJson,
+  applyConfigPatch,
+  mergeConfigObjects,
   setConfigValue,
+  writeConfigJsonAtomic,
 };

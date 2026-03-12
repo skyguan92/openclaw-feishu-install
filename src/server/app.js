@@ -16,6 +16,10 @@ function trimValue(value) {
   return String(value).trim();
 }
 
+function hasBodyValue(body, key) {
+  return Boolean(body && Object.prototype.hasOwnProperty.call(body, key));
+}
+
 function removePathIfExists(targetPath) {
   try {
     fs.rmSync(targetPath, { recursive: true, force: true });
@@ -71,9 +75,18 @@ function createApp() {
         botId: trimValue(req.body.botId) || trimValue(savedState.botId),
         botSecret: trimValue(req.body.botSecret) || trimValue(savedState.botSecret),
         websocketUrl: trimValue(req.body.websocketUrl) || trimValue(savedState.websocketUrl),
-        skipPairingApproval: req.body.skipPairingApproval !== undefined
+        skipPairingApproval: hasBodyValue(req.body, 'skipPairingApproval')
           ? Boolean(req.body.skipPairingApproval)
           : Boolean(savedState.skipPairingApproval),
+        expectedTesterName: hasBodyValue(req.body, 'expectedTesterName')
+          ? trimValue(req.body.expectedTesterName)
+          : trimValue(savedState.expectedTesterName),
+        expectedTesterId: hasBodyValue(req.body, 'expectedTesterId')
+          ? trimValue(req.body.expectedTesterId)
+          : trimValue(savedState.expectedTesterId),
+        pairingApprovalWindowMs: hasBodyValue(req.body, 'pairingApprovalWindowMs')
+          ? trimValue(req.body.pairingApprovalWindowMs)
+          : trimValue(savedState.pairingApprovalWindowMs),
         startPhase: trimValue(req.body.startPhase),
         endPhase: trimValue(req.body.endPhase),
         clearLogin: Boolean(req.body.clearLogin),

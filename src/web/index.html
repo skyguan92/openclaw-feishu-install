@@ -61,6 +61,34 @@
             <p class="font-medium text-emerald-300">企业微信全自动接入</p>
             <p class="mt-2 text-emerald-100/80">开始后会自动弹出企业微信管理后台，等待你扫码登录，然后自动创建 API 长连接机器人、抓取 Bot ID / Secret、写入 OpenClaw 并重启 Gateway。</p>
           </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">WebSocket 地址 <span class="text-gray-600">(可选)</span></label>
+            <input type="text" id="wecom-websocket-url" placeholder="默认 wss://openws.work.weixin.qq.com"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+          </div>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">部署验收用户 <span class="text-gray-600">(可选)</span></label>
+              <input type="text" id="expected-tester-name" placeholder="例如: ChiRuoJing"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">验收用户 ID <span class="text-gray-600">(可选)</span></label>
+              <input type="text" id="expected-tester-id" placeholder="例如: wxid-123"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">自动批准窗口（秒）</label>
+            <input type="number" id="pairing-window-seconds" min="1" step="1" value="90"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+          </div>
+          <div class="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3 text-xs text-emerald-100/80">
+            仅当这里填写了验收用户名称或 ID 时，工具才会在 Gateway 握手成功后开启短时 pairing watcher，并且只会自动批准命中的企业微信用户。
+          </div>
+          <div class="text-xs text-gray-500">
+            如果你只是想重新写入已有凭证，可以在断点恢复后从 `configure_openclaw` 开始，隐藏字段会沿用上次抓到的 Bot ID / Secret。
+          </div>
         </div>
 
         <details id="advanced-panel" class="rounded-xl border border-gray-800 bg-gray-950/50 p-4">

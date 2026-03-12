@@ -193,6 +193,15 @@ function applyStateToForm(state) {
   if (state.websocketUrl) {
     document.getElementById('wecom-websocket-url').value = state.websocketUrl;
   }
+  if (state.expectedTesterName) {
+    document.getElementById('expected-tester-name').value = state.expectedTesterName;
+  }
+  if (state.expectedTesterId) {
+    document.getElementById('expected-tester-id').value = state.expectedTesterId;
+  }
+  if (state.pairingApprovalWindowMs) {
+    document.getElementById('pairing-window-seconds').value = String(Math.max(1, Math.round(state.pairingApprovalWindowMs / 1000)));
+  }
 
   syncDerivedBotName();
 }
@@ -322,6 +331,10 @@ function collectPayload() {
   const appName = document.getElementById('app-name').value.trim();
   const rawBotName = document.getElementById('bot-name').value.trim();
   const botName = rawBotName || appName;
+  const pairingWindowSeconds = parseInt(
+    document.getElementById('pairing-window-seconds').value || '90',
+    10
+  );
 
   return {
     channel,
@@ -334,6 +347,12 @@ function collectPayload() {
     botSecret: document.getElementById('wecom-bot-secret').value.trim(),
     websocketUrl: document.getElementById('wecom-websocket-url').value.trim(),
     skipPairingApproval: document.getElementById('skip-pairing-approval').checked,
+    expectedTesterName: document.getElementById('expected-tester-name').value.trim(),
+    expectedTesterId: document.getElementById('expected-tester-id').value.trim(),
+    pairingApprovalWindowMs: Math.max(
+      1000,
+      (Number.isFinite(pairingWindowSeconds) ? pairingWindowSeconds : 90) * 1000
+    ),
     startPhase: document.getElementById('start-phase').value,
     endPhase: document.getElementById('end-phase').value,
     clearLogin: document.getElementById('clear-login').checked,

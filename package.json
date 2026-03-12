@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node bin/cli.js",
+    "test": "node --test test/config-helpers.test.js",
     "install-browser": "npx playwright install chromium",
     "test:publish": "node test/run-feishu-publish.js"
   },
@@ -18,7 +19,7 @@
     "ws": "^8.19.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "license": "Apache-2.0"
 }

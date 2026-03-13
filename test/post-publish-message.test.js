@@ -144,3 +144,114 @@ test('sendPostPublishMessage returns direct-use guidance when skipPairingApprova
     'did not expect pairing approve guidance in direct-use mode'
   );
 });
+
+test('sendPostPublishMessage returns not_sent soft failure when all retries exhausted', async () => {
+  const page = {};
+  const bus = createBus();
+  const originalFetch = global.fetch;
+
+  global.fetch = async (input) => {
+    const url = new URL(String(input));
+
+    if (url.pathname.endsWith('/auth/v3/tenant_access_token/internal')) {
+      return createJsonResponse(200, {
+        code: 0,
+        data: { tenant_access_token: 'tenant-token' },
+      });
+    }
+
+    if (url.pathname.endsWith('/contact/v3/scopes')) {
+      return createJsonResponse(400, { code: 99991400, msg: 'app not ready' });
+    }
+
+    if (url.pathname.endsWith('/im/v1/messages')) {
+      return createJsonResponse(400, { code: 99991663, msg: 'id not exist' });
+    }
+
+    throw new Error(`Unexpected fetch: ${url.toString()}`);
+  };
+
+  try {
+    const result = await sendPostPublishMessage(page, bus, {
+      appId: 'cli_test',
+      appSecret: 'secret_test',
+      appName: 'Test Bot',
+      operatorUserId: '7616207849110130197',
+      retryDelaysMs: [],
+    });
+
+    assert.equal(result.route, 'not_sent');
+    assert.equal(result.messageId, '');
+    assert.equal(result.operatorUserId, '7616207849110130197');
+    assert.match(result.phaseDoneMessage, /手动/);
+    assert.ok(
+      bus.logs.some((entry) => entry.includes('已知延迟')),
+      'expected soft-failure log about known delay'
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('sendPostPublishMessage retries and succeeds when API becomes ready', async () => {
+  const page = {};
+  const bus = createBus();
+  const originalFetch = global.fetch;
+  let scopeCallCount = 0;
+
+  global.fetch = async (input, fetchOptions = {}) => {
+    const url = new URL(String(input));
+
+    if (url.pathname.endsWith('/auth/v3/tenant_access_token/internal')) {
+      return createJsonResponse(200, {
+        code: 0,
+        data: { tenant_access_token: 'tenant-token' },
+      });
+    }
+
+    if (url.pathname.endsWith('/contact/v3/scopes')) {
+      scopeCallCount++;
+      if (scopeCallCount <= 2) {
+        return createJsonResponse(400, { code: 99991400, msg: 'app not ready' });
+      }
+      return createJsonResponse(200, {
+        code: 0,
+        data: { user_ids: ['ou_retry_user'] },
+      });
+    }
+
+    if (url.pathname.endsWith('/im/v1/messages')) {
+      const body = fetchOptions.body ? JSON.parse(fetchOptions.body) : null;
+      if (body?.receive_id === 'ou_retry_user') {
+        return createJsonResponse(200, {
+          code: 0,
+          data: { message_id: 'om_retry_ok' },
+        });
+      }
+      return createJsonResponse(400, { code: 99991663, msg: 'id not exist' });
+    }
+
+    throw new Error(`Unexpected fetch: ${url.toString()}`);
+  };
+
+  try {
+    const result = await sendPostPublishMessage(page, bus, {
+      appId: 'cli_test',
+      appSecret: 'secret_test',
+      appName: 'Test Bot',
+      operatorUserId: '7616207849110130197',
+      retryDelaysMs: [0, 0, 0],
+    });
+
+    assert.equal(result.route, 'scope_open_id');
+    assert.equal(result.receiveId, 'ou_retry_user');
+    assert.equal(result.messageId, 'om_retry_ok');
+    assert.equal(scopeCallCount, 3, 'expected 3 scope calls (2 failures + 1 success)');
+    assert.ok(
+      bus.logs.some((entry) => entry.includes('重试')),
+      'expected retry log'
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

@@ -3,6 +3,12 @@ const { buildFeishuUrl } = require('../config/feishu-domain');
 
 const FEISHU_OPEN_API_BASE = buildFeishuUrl('/open-apis');
 
+const DEFAULT_RETRY_DELAYS_MS = [5000, 10000, 15000];
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function sendPostPublishMessage(page, bus, options) {
   bus.sendPhase('post_publish_message', 'running', '正在给当前用户发送首条消息...');
 
@@ -14,43 +20,90 @@ async function sendPostPublishMessage(page, bus, options) {
   const tenantAccessToken = await getTenantAccessToken(options.appId, options.appSecret);
   const messageText = buildWelcomeMessage(options);
   const guidance = buildPostPublishGuidance(options);
-  const attemptErrors = [];
+  const retryDelays = Array.isArray(options.retryDelaysMs) ? options.retryDelaysMs : DEFAULT_RETRY_DELAYS_MS;
+  const maxAttempts = retryDelays.length + 1;
+
+  let lastErrors = [];
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (attempt > 1) {
+      const delayMs = retryDelays[attempt - 2];
+      bus.sendLog(`等待 ${delayMs / 1000} 秒后重试（第 ${attempt - 1}/${retryDelays.length} 次重试）...`);
+      await sleep(delayMs);
+    }
+
+    const result = await attemptSendMessage(tenantAccessToken, operator, messageText, bus);
+    if (result.sent) {
+      return finalizePostPublishResult(bus, guidance, result.value);
+    }
+
+    lastErrors = result.errors;
+    if (attempt < maxAttempts) {
+      bus.sendLog(`第 ${attempt} 次尝试失败（${lastErrors.join('；')}），将重试`);
+    }
+  }
+
+  bus.sendLog(`重试 ${retryDelays.length} 次后仍未成功（${lastErrors.join('；')}），这是新发布应用的已知延迟，不影响核心功能`);
+  return finalizePostPublishResult(bus, {
+    ...guidance,
+    phaseDoneMessage: '首条消息未能自动发送（API 延迟），用户可在飞书中手动找到 bot 开始对话',
+    followUpLogs: [
+      '飞书 API 对新发布的应用存在权限生效延迟，首条消息未能自动送达。',
+      '请在飞书中搜索机器人名称，手动打开 bot 对话即可开始使用。',
+    ],
+  }, {
+    route: 'not_sent',
+    receiveId: operator.userId,
+    receiveIdType: 'user_id',
+    messageId: '',
+    operatorUserId: operator.userId,
+  });
+}
+
+async function attemptSendMessage(tenantAccessToken, operator, messageText, bus) {
+  const errors = [];
 
   try {
     const scopedTarget = await resolveScopedMessageTarget(tenantAccessToken, operator.userId, bus);
     if (scopedTarget && scopedTarget.openId) {
       const result = await createTextMessage(tenantAccessToken, 'open_id', scopedTarget.openId, messageText);
       bus.sendLog(`已通过 contact/v3/scopes 定位到 open_id 并发送首条消息: ${scopedTarget.openId}`);
-      return finalizePostPublishResult(bus, guidance, {
-        route: 'scope_open_id',
-        receiveId: scopedTarget.openId,
-        receiveIdType: 'open_id',
-        messageId: result.message_id || '',
-        operatorUserId: operator.userId,
-      });
+      return {
+        sent: true,
+        value: {
+          route: 'scope_open_id',
+          receiveId: scopedTarget.openId,
+          receiveIdType: 'open_id',
+          messageId: result.message_id || '',
+          operatorUserId: operator.userId,
+        },
+      };
     }
 
-    attemptErrors.push('contact/v3/scopes 未能唯一定位当前操作者');
+    errors.push('contact/v3/scopes 未能唯一定位当前操作者');
   } catch (err) {
-    attemptErrors.push(`contact/v3/scopes 失败: ${err.message}`);
+    errors.push(`contact/v3/scopes 失败: ${err.message}`);
     bus.sendLog(`通过 contact/v3/scopes 获取 open_id 失败，准备回退到 user_id 直发: ${err.message}`);
   }
 
   try {
     const result = await createTextMessage(tenantAccessToken, 'user_id', operator.userId, messageText);
     bus.sendLog(`已回退为 user_id 直发首条消息: ${operator.userId}`);
-    return finalizePostPublishResult(bus, guidance, {
-      route: 'user_id',
-      receiveId: operator.userId,
-      receiveIdType: 'user_id',
-      messageId: result.message_id || '',
-      operatorUserId: operator.userId,
-    });
+    return {
+      sent: true,
+      value: {
+        route: 'user_id',
+        receiveId: operator.userId,
+        receiveIdType: 'user_id',
+        messageId: result.message_id || '',
+        operatorUserId: operator.userId,
+      },
+    };
   } catch (err) {
-    attemptErrors.push(`user_id 直发失败: ${err.message}`);
+    errors.push(`user_id 直发失败: ${err.message}`);
   }
 
-  throw new Error(`发送首条消息失败：${attemptErrors.join('；')}`);
+  return { sent: false, errors };
 }
 
 function finalizePostPublishResult(bus, guidance, result) {

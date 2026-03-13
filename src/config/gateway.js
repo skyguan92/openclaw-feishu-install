@@ -108,12 +108,27 @@ async function restartGateway(bus) {
       return;
     }
 
-    bus.sendLog('现有 Gateway 服务重载后仍未就绪，准备执行安装修复...');
-  } else {
-    bus.sendLog('未检测到现有 Gateway 服务，准备执行安装...');
+    // 服务已安装但重载失败 — 修复配置后直接启动，跳过 install --force（避免权限不足）
+    bus.sendLog('Gateway 服务重载未就绪，尝试修复配置后重新启动...');
+    restoreConfigSnapshot(bus, configSnapshot);
+    if (process.platform === 'darwin') {
+      applyGatewayLaunchAgentEnvironment(bus, launchAgentEnvSnapshot);
+      reloadGatewayLaunchAgent(bus);
+    } else {
+      startExistingGatewayService(bus);
+    }
+
+    status = await waitForGatewayReady(bus);
+    if (isGatewayReady(status)) {
+      bus.sendLog('Gateway 已启动并通过 RPC 检查');
+      return;
+    }
+
+    throw new Error('Gateway 启动超时，请运行 openclaw gateway status 检查服务状态');
   }
 
-  bus.sendLog(`执行 Gateway 安装/重装（port=${targetPort}）...`);
+  bus.sendLog('未检测到现有 Gateway 服务，准备执行安装...');
+  bus.sendLog(`执行 Gateway 安装（port=${targetPort}）...`);
   const installResult = runOpenClawJson(
     ['gateway', 'install', '--force', '--port', String(targetPort)],
     { timeout: 120000 }

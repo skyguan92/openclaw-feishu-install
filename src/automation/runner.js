@@ -520,7 +520,7 @@ class Runner {
       return;
     }
 
-    this.bus.sendLog('启动 Playwright 浏览器...');
+    this.bus.sendLog('启动浏览器...');
 
     if (isLikelyWindowsSshSession()) {
       this.bus.sendLog('检测到 Windows SSH 会话，浏览器窗口可能不会显示在用户桌面上。');
@@ -535,20 +535,27 @@ class Runner {
     };
     const profileDir = getBrowserProfileDir(this.channel);
 
-    try {
-      this.browser = await launchPersistentContext(profileDir, launchOptions, this.bus);
-    } catch {
-      this.bus.sendLog('Playwright 自带浏览器未安装，尝试使用系统 Chrome / Edge...');
-      const systemBrowserPath = findSystemBrowserExecutable();
-      if (!systemBrowserPath) {
+    // 优先使用系统已安装的浏览器，避免不必要的 Playwright 浏览器下载
+    const systemBrowserPath = findSystemBrowserExecutable();
+    if (systemBrowserPath) {
+      this.bus.sendLog(`检测到系统浏览器: ${systemBrowserPath}`);
+      launchOptions.executablePath = systemBrowserPath;
+      try {
+        this.browser = await launchPersistentContext(profileDir, launchOptions, this.bus);
+      } catch {
+        this.bus.sendLog('系统浏览器启动失败，回退到 Playwright 自带浏览器...');
+        delete launchOptions.executablePath;
+        this.browser = await launchPersistentContext(profileDir, launchOptions, this.bus);
+      }
+    } else {
+      this.bus.sendLog('未检测到系统浏览器，尝试使用 Playwright 自带浏览器...');
+      try {
+        this.browser = await launchPersistentContext(profileDir, launchOptions, this.bus);
+      } catch {
         throw new Error(
-          '未找到可用浏览器。请运行 npx playwright install chromium，或安装 Google Chrome / Microsoft Edge'
+          '未找到可用浏览器。请安装 Google Chrome / Microsoft Edge，或运行 npx playwright install chromium'
         );
       }
-
-      launchOptions.executablePath = systemBrowserPath;
-      this.browser = await launchPersistentContext(profileDir, launchOptions, this.bus);
-      this.bus.sendLog(`使用系统浏览器: ${systemBrowserPath}`);
     }
 
     this.bus.sendLog(`使用持久化浏览器目录: ${profileDir}`);

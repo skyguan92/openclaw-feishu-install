@@ -162,8 +162,9 @@ function ensureFeishuPlugin(bus) {
 function ensureFeishuSdk(bus) {
   const packageDir = resolveOpenClawPackageDir();
   if (!packageDir) {
-    bus.sendLog('未能定位 OpenClaw 安装目录，跳过飞书 SDK 检查');
-    return;
+    throw new Error(
+      '未能定位 OpenClaw 安装目录，无法验证飞书 SDK 是否可用。请确认 OpenClaw 已正确安装。'
+    );
   }
 
   const sdkPackageJson = getInstalledFeishuSdkPackageJson(packageDir);

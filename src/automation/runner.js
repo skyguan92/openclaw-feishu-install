@@ -196,6 +196,7 @@ class Runner {
       endPhase: trimValue(options.endPhase),
       clearLogin: Boolean(options.clearLogin),
       resetState: Boolean(options.resetState),
+      forceNewVersion: options.forceNewVersion === true,
     };
     this.running = false;
     this.cancelled = false;
@@ -772,7 +773,9 @@ class Runner {
     }, '事件订阅已配置');
 
     await this.runSelectedPhase('publish', async () => {
-      const result = await publishApp(this.page, this.bus, this.state.appId);
+      const result = await publishApp(this.page, this.bus, this.state.appId, {
+        forceNewVersion: this.options?.forceNewVersion === true,
+      });
       this.state.publishStatus = result?.status || null;
       this.state.publishPrimaryMessage = result?.primaryMessage || '';
       this.state.publishManualActionRequired = result?.manualActionRequired === true;

@@ -91,6 +91,7 @@ function createApp() {
         endPhase: trimValue(req.body.endPhase),
         clearLogin: Boolean(req.body.clearLogin),
         resetState: Boolean(req.body.resetState),
+        forceNewVersion: Boolean(req.body.forceNewVersion),
       });
     } catch (err) {
       return res.status(400).json({ error: err.message });
